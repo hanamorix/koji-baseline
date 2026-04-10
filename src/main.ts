@@ -27,6 +27,7 @@ import { MouseReporter } from "./terminal/mouse";
 import { fontManager } from "./fonts/fonts";
 import { Autocomplete } from "./terminal/autocomplete";
 import { TerminalSearch } from "./terminal/search";
+import { applyClickableRegions } from "./terminal/clickable";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -156,12 +157,18 @@ listen("theme-applied", () => {
 
 // ─── Terminal I/O ─────────────────────────────────────────────────────────────
 
+let clickableTimer: ReturnType<typeof setTimeout> | null = null;
+
 listen<GridSnapshot>("terminal-output", (event) => {
   mouse.updateMode(event.payload.mouse_mode);
   domGrid.render(event.payload);
   if (event.payload.title) {
     document.title = event.payload.title;
   }
+  if (clickableTimer) clearTimeout(clickableTimer);
+  clickableTimer = setTimeout(() => {
+    applyClickableRegions(domGrid.getScrollElement(), event.payload.mouse_mode).catch(() => {});
+  }, 200);
 }).catch((err) => {
   console.warn("terminal-output listener failed:", err);
 });

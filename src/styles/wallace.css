@@ -830,3 +830,11 @@ html, body {
   background: rgba(255, 140, 0, 0.4) !important;
   border-radius: 1px;
 }
+
+/* ── Clickable URLs and paths ────────────────────────────────────────────── */
+
+.cell.clickable-hover {
+  text-decoration: underline;
+  text-decoration-color: var(--koji-orange);
+  cursor: pointer;
+}

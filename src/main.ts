@@ -24,6 +24,7 @@ import { agentPane } from "./agent/pane";
 import { llmOnboarding } from "./llm/onboarding";
 import { SelectionManager } from "./terminal/selection";
 import { fontManager } from "./fonts/fonts";
+import { Autocomplete } from "./terminal/autocomplete";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,7 @@ invoke("load_config", { key: "copy_on_select" }).then((val: unknown) => {
   if (val === "false") selection.setCopyOnSelect(false);
 }).catch(() => {});
 const effects = new TransitionEffects(domGrid.getGridElement());
+const autocomplete = new Autocomplete(domGrid.getGridElement());
 
 // ── Idle animator (kanji cycling only, no canvas) ──────────────────────────
 const idle = new IdleAnimator();
@@ -217,9 +219,29 @@ window.addEventListener("keydown", async (event) => {
     return;
   }
 
+  // ── Right Arrow — accept autocomplete suggestion ─────────────────────────
+  if (key === "ArrowRight" && autocomplete.getSuggestion()) {
+    event.preventDefault();
+    const suggestion = autocomplete.accept();
+    if (suggestion) {
+      if (suggestion.startsWith("/") || suggestion.startsWith(">>")) {
+        // Slash command or LLM prefix — just replace currentInput
+        currentInput = suggestion;
+      } else {
+        // Shell command — write the remaining chars to PTY
+        const remaining = suggestion.slice(currentInput.length);
+        currentInput = suggestion;
+        const bytes = Array.from(new TextEncoder().encode(remaining));
+        invoke("write_to_pty", { data: bytes }).catch(console.error);
+      }
+    }
+    return;
+  }
+
   // Build up the current input line for context tracking
   if (!ctrlKey) {
     if (key === "Enter") {
+      autocomplete.hide();
       const line = currentInput.trim();
 
       if (line.startsWith("/")) {
@@ -270,6 +292,7 @@ window.addEventListener("keydown", async (event) => {
       // Regular shell command — record it for context, fire submit effect
       if (line.length > 0) {
         commandHistory.addCommand(line);
+        autocomplete.addToHistory(line);
         effects.commandSubmit();
       }
       currentInput = "";
@@ -282,6 +305,9 @@ window.addEventListener("keydown", async (event) => {
         overlay.dismiss();
       }
     }
+
+    // Update autocomplete ghost text
+    autocomplete.update(currentInput);
 
     // If we're composing a slash command or LLM query, don't send to PTY
     if (currentInput.startsWith("/") || currentInput.startsWith(">>")) {

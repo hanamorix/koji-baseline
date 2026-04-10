@@ -4,6 +4,7 @@
 // Task 10: Inline LLM response block rendered below the cursor row.
 
 import { applyScrollbackFade } from "./scrollback";
+import { ClickableRegion, findRegionAt } from "./clickable";
 
 const CELL_WIDTH = 9;
 const CELL_HEIGHT = 18;
@@ -58,6 +59,8 @@ export class TerminalGrid {
   private rafHandle = 0;
   private lastSnapshot: GridSnapshot | null = null;
   private llmState: LlmState | null = null;
+  private clickableRegions: ClickableRegion[] = [];
+  private hoveredRegion: ClickableRegion | null = null;
 
   constructor(container: HTMLElement) {
     this.canvas = document.createElement("canvas");
@@ -128,6 +131,25 @@ export class TerminalGrid {
     return this.canvas;
   }
 
+  setClickableRegions(regions: ClickableRegion[]): void {
+    this.clickableRegions = regions;
+    if (this.lastSnapshot) this.drawGrid(this.lastSnapshot);
+  }
+
+  getClickableRegions(): ClickableRegion[] {
+    return this.clickableRegions;
+  }
+
+  /**
+   * Update the hovered region, flip the cursor style on the canvas element,
+   * and trigger an immediate redraw so the underline appears / disappears.
+   */
+  setHoveredRegion(region: ClickableRegion | null): void {
+    this.hoveredRegion = region;
+    this.canvas.style.cursor = region ? "pointer" : "default";
+    if (this.lastSnapshot) this.drawGrid(this.lastSnapshot);
+  }
+
   /** Cancel the cursor animation RAF — call when unmounting the grid. */
   destroy(): void {
     if (this.rafHandle) cancelAnimationFrame(this.rafHandle);
@@ -170,14 +192,32 @@ export class TerminalGrid {
 
         if (cell.character && cell.character.trim() !== "") {
           const fadedFg = applyScrollbackFade(cell.fg, row, snapshot.rows, snapshot.cursor.row);
-          ctx.fillStyle = rgbToHex(fadedFg);
           ctx.font = buildFont(cell.bold, cell.italic);
           ctx.globalAlpha = cell.dim ? 0.5 : 1.0;
+
+          // Clickable region highlight — accent colour overrides normal fg
+          const region = findRegionAt(this.clickableRegions, row, col);
+          if (region) {
+            const accentColor = getComputedStyle(document.documentElement)
+              .getPropertyValue("--koji-orange").trim() || "#cc7a00";
+            ctx.fillStyle = accentColor;
+          } else {
+            ctx.fillStyle = rgbToHex(fadedFg);
+          }
+
           ctx.fillText(cell.character, x, y + 1);
           ctx.globalAlpha = 1.0;
 
           if (cell.underline) {
             ctx.fillStyle = rgbToHex(fadedFg);
+            ctx.fillRect(x, y + CELL_HEIGHT - 2, CELL_WIDTH, 1);
+          }
+
+          // Hover underline — 1px below character in accent colour
+          if (region && region === this.hoveredRegion) {
+            const accentColor = getComputedStyle(document.documentElement)
+              .getPropertyValue("--koji-orange").trim() || "#cc7a00";
+            ctx.fillStyle = accentColor;
             ctx.fillRect(x, y + CELL_HEIGHT - 2, CELL_WIDTH, 1);
           }
         }

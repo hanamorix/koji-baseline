@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { TerminalGrid, GridSnapshot } from "./terminal/grid";
+import { detectClickableRegions, findRegionAt } from "./terminal/clickable";
 import { initDashboard } from "./dashboard/status-bar";
 import { WaveformAnimator } from "./animation/waveform";
 import { LlmPanel } from "./llm/panel";
@@ -110,10 +111,28 @@ invoke<{ model: string; state: string }>("check_ollama")
     if (dotEl) dotEl.style.background = "#3a2a10";
   });
 
+// ─── CWD tracking — updated by the same "cwd-changed" event the status bar uses
+
+let currentCwd = "~";
+listen<{ path: string }>("cwd-changed", (event) => {
+  currentCwd = event.payload.path;
+}).catch((err) => {
+  console.warn("cwd-changed (main) listener failed:", err);
+});
+
 // ─── Terminal I/O ─────────────────────────────────────────────────────────────
+
+let clickableTimer = 0;
 
 listen<GridSnapshot>("terminal-output", (event) => {
   grid.render(event.payload);
+
+  // Debounce region detection — scan 200 ms after the last output burst
+  clearTimeout(clickableTimer);
+  clickableTimer = window.setTimeout(async () => {
+    const regions = await detectClickableRegions(event.payload.cells, currentCwd);
+    grid.setClickableRegions(regions);
+  }, 200);
 });
 
 // Dynamic initial size based on container dimensions
@@ -141,6 +160,43 @@ const resizeObserver = new ResizeObserver((entries) => {
   }, 50);
 });
 resizeObserver.observe(container);
+
+// ─── Canvas mouse interaction — hover highlights + click-to-open ─────────────
+
+const terminalCanvas = grid.getCanvas();
+
+terminalCanvas.addEventListener("mousemove", (event: MouseEvent) => {
+  const { row, col } = grid.getCellFromClick(event);
+  const region = findRegionAt(grid.getClickableRegions(), row, col);
+  grid.setHoveredRegion(region ?? null);
+});
+
+terminalCanvas.addEventListener("mouseleave", () => {
+  grid.setHoveredRegion(null);
+});
+
+terminalCanvas.addEventListener("click", async (event: MouseEvent) => {
+  const { row, col } = grid.getCellFromClick(event);
+  const region = findRegionAt(grid.getClickableRegions(), row, col);
+  if (!region) return;
+
+  if (region.type === "url") {
+    invoke("open_url", { url: region.value }).catch((err) => {
+      console.error("open_url failed:", err);
+    });
+  } else if (region.type === "directory") {
+    // Navigate shell into directory — send as if typed at the prompt
+    const cmd = `cd ${region.value}\r`;
+    const bytes = Array.from(new TextEncoder().encode(cmd));
+    invoke("write_to_pty", { data: bytes }).catch((err) => {
+      console.error("cd write_to_pty failed:", err);
+    });
+  } else if (region.type === "file") {
+    invoke("open_file", { path: region.value }).catch((err) => {
+      console.error("open_file failed:", err);
+    });
+  }
+});
 
 // ─── Keyboard input ───────────────────────────────────────────────────────────
 

@@ -630,6 +630,27 @@ pub fn run() {
         ])
         .setup(|app| {
             monitor::start_monitor(app.handle().clone());
+
+            // Load saved model from config on startup
+            use tauri::Manager;
+            let ollama: Arc<AsyncMutex<ollama::OllamaClient>> =
+                app.state::<OllamaState>().0.clone();
+            let config_path = dirs::home_dir()
+                .map(|h| h.join(".koji-baseline").join("config.json"));
+            if let Some(path) = config_path {
+                if let Ok(data) = std::fs::read_to_string(&path) {
+                    if let Ok(config) = serde_json::from_str::<serde_json::Value>(&data) {
+                        if let Some(model) = config.get("activeModel").and_then(|v| v.as_str()) {
+                            let model = model.to_string();
+                            tauri::async_runtime::spawn(async move {
+                                let mut client = ollama.lock().await;
+                                client.set_model(model);
+                            });
+                        }
+                    }
+                }
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

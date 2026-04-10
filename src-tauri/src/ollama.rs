@@ -58,7 +58,7 @@ impl OllamaClient {
         Self {
             client: reqwest::Client::new(),
             base_url: "http://localhost:11434".to_string(),
-            current_model: "nell-dpo".to_string(),
+            current_model: String::new(), // Set by onboarding or /llm model
         }
     }
 
@@ -84,6 +84,10 @@ impl OllamaClient {
         messages: Vec<ChatMessage>,
         app: &AppHandle,
     ) -> Result<(), String> {
+        if self.current_model.is_empty() {
+            return Err("No model selected. Click the >> badge or run /llm model <name> to choose one.".into());
+        }
+
         let url = format!("{}/api/chat", self.base_url);
 
         let body = ChatRequest {

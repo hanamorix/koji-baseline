@@ -229,17 +229,21 @@ window.addEventListener("keydown", async (event) => {
     // Don't return — let it fall through to keyToAnsi to send to PTY
   }
 
-  // ── Right Arrow — accept autocomplete suggestion ─────────────────────────
+  // ── Autocomplete navigation ──────────────────────────────────────────────
   if (key === "ArrowRight" && autocomplete.getSuggestion()) {
     event.preventDefault();
     const suggestion = autocomplete.accept();
     if (suggestion) {
       const remaining = suggestion.slice(currentInput.length);
       currentInput = suggestion;
-      // Write remaining chars to PTY so they appear in terminal
       const bytes = Array.from(new TextEncoder().encode(remaining));
       invoke("write_to_pty", { data: bytes }).catch(console.error);
     }
+    return;
+  }
+  if ((key === "ArrowDown" || key === "ArrowUp") && autocomplete.isDropdownOpen()) {
+    event.preventDefault();
+    autocomplete.navigate(key === "ArrowDown" ? 1 : -1);
     return;
   }
 

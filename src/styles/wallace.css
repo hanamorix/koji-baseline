@@ -565,12 +565,73 @@ html, body {
   background: rgba(255, 140, 0, 0.25);
 }
 
-/* ── Inline ghost text (autocomplete suggestions at cursor) ──────────────── */
+/* ── Autocomplete: floating ghost + suggestion dropdown ──────────────────── */
 
-.inline-ghost {
+.ghost-float {
+  position: absolute;
+  pointer-events: none;
+  z-index: 6;
   color: var(--koji-faded);
   opacity: 0.5;
-  pointer-events: none;
+  white-space: pre;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.3;
+  display: none;
+}
+
+.suggest-dropdown {
+  position: absolute;
+  z-index: 10;
+  background: rgba(15, 15, 15, 0.96);
+  border: 1px solid var(--koji-dim);
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 200px;
+  max-width: 400px;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  cursor: default;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.suggest-item:hover,
+.suggest-item.selected {
+  background: rgba(255, 140, 0, 0.12);
+}
+
+.suggest-icon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 11px;
+}
+
+.suggest-label {
+  color: var(--koji-warm);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggest-item.selected .suggest-label {
+  color: var(--koji-bright);
+}
+
+.suggest-kind {
+  color: var(--koji-faded);
+  font-size: 10px;
+  flex-shrink: 0;
 }
 
 /* ── Command transition effects (CSS-only) ──────────────────────────────── */

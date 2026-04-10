@@ -64,7 +64,7 @@ export class BootSequence {
   // ── Phase 1: logo ────────────────────────────────────────────────────────────
 
   private async renderLogo(): Promise<void> {
-    const { ctx, canvas } = this;
+    const { ctx } = this;
     this.clear();
     this.setFont();
 
@@ -110,7 +110,7 @@ export class BootSequence {
   // ── Phase 2: boot messages ───────────────────────────────────────────────────
 
   private async renderMessages(): Promise<void> {
-    const { ctx, canvas } = this;
+    const { ctx } = this;
     this.setFont();
 
     const charW  = ctx.measureText("M").width;
@@ -182,7 +182,7 @@ export class BootSequence {
   // ── Phase 3: fade out ────────────────────────────────────────────────────────
 
   private async fadeOut(): Promise<void> {
-    const { ctx, canvas } = this;
+    const { ctx } = this;
     // Progressively cover with near-transparent black until opaque
     for (let alpha = 0; alpha < 1; alpha += 0.05) {
       if (this.skipped) break;

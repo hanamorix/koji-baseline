@@ -21,6 +21,7 @@ import type { CommandResult } from "./commands/router";
 import { overlay } from "./overlay/overlay";
 import { openMenu } from "./overlay/menu";
 import type { MenuResult } from "./overlay/menu";
+import { agentPane } from "./agent/pane";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -233,6 +234,13 @@ window.addEventListener("keydown", async (event) => {
   // ── Cmd+C — selection not yet implemented, just swallow it ───────────────
   if (metaKey && key === "c") {
     event.preventDefault();
+    return;
+  }
+
+  // ── Escape — close agent pane if open (before passing to PTY) ───────────
+  if (key === "Escape" && agentPane.isOpen) {
+    event.preventDefault();
+    agentPane.close();
     return;
   }
 

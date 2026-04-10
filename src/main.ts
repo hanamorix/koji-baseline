@@ -91,22 +91,32 @@ llm.onResponseUpdate((text, done) => {
   overlay.updateStreaming(text, done);
 });
 
-// Check Ollama on startup — update dashboard elements if present
-invoke<{ model: string; state: string }>("check_ollama")
-  .then((status) => {
-    const modelEl = document.getElementById("llm-model");
-    const dotEl = document.getElementById("llm-dot");
-    if (modelEl) modelEl.textContent = status.model;
-    if (dotEl) {
-      dotEl.style.background =
-        status.state === "ready" ? "#cc7a00" : "#3a2a10";
-    }
-  })
-  .catch(() => {
-    // Ollama not running — dashboard stays dim, not a hard failure
-    const dotEl = document.getElementById("llm-dot");
-    if (dotEl) dotEl.style.background = "#3a2a10";
-  });
+// Load saved model and check Ollama on startup — update dashboard badge
+{
+  const modelEl = document.getElementById("llm-model");
+  const dotEl = document.getElementById("llm-dot");
+
+  // First: restore saved model name so the badge shows it immediately
+  invoke<string>("load_config", { key: "activeModel" }).then((saved) => {
+    if (saved && modelEl) modelEl.textContent = saved;
+  }).catch(() => {});
+
+  // Then: check Ollama status and update dot colour
+  invoke<{ model: string; state: string }>("check_ollama")
+    .then((status) => {
+      // If Ollama reports a model and we haven't loaded one from config, show it
+      if (modelEl && !modelEl.textContent && status.model) {
+        modelEl.textContent = status.model;
+      }
+      if (dotEl) {
+        dotEl.style.background =
+          status.state === "ready" ? "#cc7a00" : "#3a2a10";
+      }
+    })
+    .catch(() => {
+      if (dotEl) dotEl.style.background = "#3a2a10";
+    });
+}
 
 // Expose onboarding handler for the >> badge onclick in index.html
 (window as unknown as Record<string, unknown>)["__kojiLlmOnboard"] = () => {

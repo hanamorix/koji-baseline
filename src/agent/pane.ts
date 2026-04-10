@@ -181,6 +181,11 @@ export class AgentPane {
       if (child instanceof HTMLElement) child.style.display = "";
     }
 
+    // Dismiss any leftover overlay content so it doesn't cover the terminal
+    import("../overlay/overlay").then(({ overlay }) => {
+      overlay.dismiss();
+    }).catch(() => {});
+
     // Resize terminal back to full width
     import("../main").then(({ domGrid }) => {
       const { rows, cols } = domGrid.measureGrid();

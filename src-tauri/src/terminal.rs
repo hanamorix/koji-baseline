@@ -24,6 +24,9 @@ pub struct RenderCell {
     pub italic: bool,
     pub underline: bool,
     pub dim: bool,
+    pub strikethrough: bool,
+    pub hidden: bool,
+    pub blink: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -160,6 +163,10 @@ pub fn cell_to_render(
     let italic = cell.flags.contains(Flags::ITALIC);
     let underline = cell.flags.contains(Flags::UNDERLINE);
     let dim = cell.flags.contains(Flags::DIM);
+    let strikethrough = cell.flags.contains(Flags::STRIKEOUT);
+    let hidden = cell.flags.contains(Flags::HIDDEN);
+    // alacritty_terminal 0.25.1 has no BLINK flag — keep field for frontend compat
+    let blink = false;
 
     // Respect INVERSE flag — swap fg/bg
     let (fg_color, bg_color) = if cell.flags.contains(Flags::INVERSE) {
@@ -176,6 +183,9 @@ pub fn cell_to_render(
         italic,
         underline,
         dim,
+        strikethrough,
+        hidden,
+        blink,
     }
 }
 

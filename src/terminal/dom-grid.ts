@@ -10,6 +10,9 @@ export interface RenderCell {
   dim: boolean;
   wide?: boolean;
   spacer?: boolean;
+  strikethrough?: boolean;
+  hidden?: boolean;
+  blink?: boolean;
 }
 
 export interface CursorPos {
@@ -34,7 +37,7 @@ interface RowState {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function cellHash(cell: RenderCell): string {
-  return `${cell.character}|${cell.fg[0]},${cell.fg[1]},${cell.fg[2]}|${cell.bg[0]},${cell.bg[1]},${cell.bg[2]}|${cell.bold ? 1 : 0}${cell.italic ? 1 : 0}${cell.underline ? 1 : 0}${cell.dim ? 1 : 0}${cell.wide ? 1 : 0}`;
+  return `${cell.character}|${cell.fg[0]},${cell.fg[1]},${cell.fg[2]}|${cell.bg[0]},${cell.bg[1]},${cell.bg[2]}|${cell.bold ? 1 : 0}${cell.italic ? 1 : 0}${cell.underline ? 1 : 0}${cell.dim ? 1 : 0}${cell.wide ? 1 : 0}${cell.strikethrough ? 1 : 0}${cell.hidden ? 1 : 0}${cell.blink ? 1 : 0}`;
 }
 
 function rowHash(cells: RenderCell[]): string {
@@ -63,11 +66,18 @@ function buildRowHTML(cells: RenderCell[]): string {
     if (cell.bold) style += "font-weight:bold;";
     if (cell.italic) style += "font-style:italic;";
     if (cell.dim) style += "opacity:0.5;";
+    if (cell.hidden) style += "visibility:hidden;";
 
-    const cls = cell.wide ? "cell wide" : "cell";
-    const decoration = cell.underline ? ` style="${style}text-decoration:underline;"` : ` style="${style}"`;
+    // Compose text-decoration from underline + strikethrough
+    const decorations: string[] = [];
+    if (cell.underline) decorations.push("underline");
+    if (cell.strikethrough) decorations.push("line-through");
+    if (decorations.length > 0) style += `text-decoration:${decorations.join(" ")};`;
 
-    html += `<span class="${cls}"${decoration}>${char}</span>`;
+    let cls = cell.wide ? "cell wide" : "cell";
+    if (cell.blink) cls += " cell-blink";
+
+    html += `<span class="${cls}" style="${style}">${char}</span>`;
   }
   return html;
 }

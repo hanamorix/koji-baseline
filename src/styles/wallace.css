@@ -640,6 +640,15 @@ html, body {
   50% { border-left: 3px solid transparent; }
 }
 
+.cell-blink {
+  animation: cell-text-blink 1s step-end infinite;
+}
+
+@keyframes cell-text-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 /* Selection highlight */
 .terminal-grid ::selection {
   background: rgba(255, 140, 0, 0.25);

@@ -42,6 +42,7 @@ export class LlmOnboarding {
       `● Ollama ready  ·  model: ${status.model}\n\nType >> followed by your question, or /agent for the full agent.`,
       false,
     );
+    overlay.dismissAfter(4000);
   }
 
   // ── Ollama offline message ────────────────────────────────────────────────────
@@ -112,8 +113,10 @@ export class LlmOnboarding {
             `● Ready!  model: ${modelName}\n\nType >> followed by your question, or /agent for the full agent.`,
             false,
           );
+          overlay.dismissAfter(4000);
         } catch (e) {
           overlay.showMessage(`Failed to activate model: ${e}`, true);
+          overlay.dismissAfter(5000);
         }
       },
     });

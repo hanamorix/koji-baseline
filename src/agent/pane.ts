@@ -115,10 +115,21 @@ export class AgentPane {
     this.session.on((event) => this.handleEvent(event));
 
     // ── Click-to-focus ────────────────────────────────────────────────────────
-    pane.addEventListener("click", () => input.focus());
-    if (canvas) {
-      (canvas as HTMLElement).addEventListener("click", () => input.blur());
-    }
+    // Click agent pane → focus input, click terminal → blur input so global keydown takes over
+    pane.addEventListener("click", (e) => {
+      // Don't steal focus if clicking a button or other interactive element
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
+      input.focus();
+    });
+
+    // Listen on the entire container — clicks on canvas, overlay, or divider all blur the agent input
+    container.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      // Only blur if click landed outside the agent pane
+      if (!pane.contains(target)) {
+        input.blur();
+      }
+    });
 
     // ── Input — send on Enter ─────────────────────────────────────────────────
     input.addEventListener("keydown", (e) => {

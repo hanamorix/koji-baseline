@@ -50,6 +50,13 @@ export class TerminalOverlay {
     this.deactivate();
   }
 
+  /** Dismiss after a timeout — useful for transient success messages. */
+  dismissAfter(ms: number): void {
+    setTimeout(() => {
+      if (this._isActive) this.dismiss();
+    }, ms);
+  }
+
   /** Mount a raw DOM element into the overlay (used by menus, agent pane). */
   mount(element: HTMLElement): void {
     this.dismiss();

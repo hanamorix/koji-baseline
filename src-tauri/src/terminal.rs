@@ -39,6 +39,7 @@ pub struct GridSnapshot {
     pub rows: usize,
     pub cols: usize,
     pub is_alt_screen: bool,
+    pub mouse_mode: u8,
 }
 
 // ─── Named colour palette ──────────────────────────────────────────────────
@@ -254,12 +255,23 @@ impl TerminalEngine {
         let cursor_row = cursor_point.line.0.max(0) as usize;
         let cursor_col = cursor_point.column.0;
 
+        let mode = self.term.mode();
+        let mouse_mode = {
+            let mut m: u8 = 0;
+            if mode.contains(TermMode::MOUSE_REPORT_CLICK) { m |= 1; }
+            if mode.contains(TermMode::MOUSE_DRAG) { m |= 2; }
+            if mode.contains(TermMode::MOUSE_MOTION) { m |= 4; }
+            if mode.contains(TermMode::SGR_MOUSE) { m |= 8; }
+            m
+        };
+
         GridSnapshot {
             cells,
             cursor: CursorPos { row: cursor_row, col: cursor_col },
             rows: self.rows,
             cols: self.cols,
-            is_alt_screen: self.term.mode().contains(TermMode::ALT_SCREEN),
+            is_alt_screen: mode.contains(TermMode::ALT_SCREEN),
+            mouse_mode,
         }
     }
 

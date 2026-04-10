@@ -23,6 +23,7 @@ import type { MenuResult } from "./overlay/menu";
 import { agentPane } from "./agent/pane";
 import { llmOnboarding } from "./llm/onboarding";
 import { SelectionManager } from "./terminal/selection";
+import { MouseReporter } from "./terminal/mouse";
 import { fontManager } from "./fonts/fonts";
 import { Autocomplete } from "./terminal/autocomplete";
 
@@ -67,6 +68,7 @@ fontManager.setChangeCallback((font, size, ligatures) => {
 // Load saved font preference
 fontManager.loadSaved();
 
+const mouse = new MouseReporter(domGrid);
 const selection = new SelectionManager(domGrid.getGridElement());
 invoke("load_config", { key: "copy_on_select" }).then((val: unknown) => {
   if (val === "false") selection.setCopyOnSelect(false);
@@ -153,6 +155,7 @@ listen("theme-applied", () => {
 // ─── Terminal I/O ─────────────────────────────────────────────────────────────
 
 listen<GridSnapshot>("terminal-output", (event) => {
+  mouse.updateMode(event.payload.mouse_mode);
   domGrid.render(event.payload);
 }).catch((err) => {
   console.warn("terminal-output listener failed:", err);

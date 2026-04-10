@@ -23,6 +23,7 @@ export interface GridSnapshot {
   rows: number;
   cols: number;
   is_alt_screen: boolean;
+  mouse_mode: number;
 }
 
 interface RowState {
@@ -176,6 +177,27 @@ export class DOMGrid {
 
   getScrollElement(): HTMLDivElement {
     return this.scrollEl;
+  }
+
+  getMouseMode(): number {
+    return this.lastSnapshot?.mouse_mode ?? 0;
+  }
+
+  getCellFromMouse(event: MouseEvent): { row: number; col: number } | null {
+    for (let r = 0; r < this.viewportRows.length; r++) {
+      const rowEl = this.viewportRows[r].el;
+      const rowRect = rowEl.getBoundingClientRect();
+      if (event.clientY >= rowRect.top && event.clientY < rowRect.bottom) {
+        for (let c = 0; c < rowEl.children.length; c++) {
+          const cellRect = (rowEl.children[c] as HTMLElement).getBoundingClientRect();
+          if (event.clientX >= cellRect.left && event.clientX < cellRect.right) {
+            return { row: r, col: c };
+          }
+        }
+        return { row: r, col: Math.max(0, rowEl.children.length - 1) };
+      }
+    }
+    return null;
   }
 
   setFont(family: string, size: number, ligatures: boolean): void {

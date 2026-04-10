@@ -4,6 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { THEMES, THEME_NAMES } from "../themes/themes";
 import { themeManager } from "../themes/manager";
+import { agentPane } from "../agent/pane";
 import type { MenuResult } from "./router";
 
 // ─── /help ────────────────────────────────────────────────────────────────────
@@ -255,14 +256,21 @@ export async function handleLlm(args: string[]): Promise<{ output: string; isErr
 // ─── /agent ───────────────────────────────────────────────────────────────────
 
 export async function handleAgent(_args: string[]): Promise<{ output: string; isError: boolean }> {
-  // Placeholder — Task 9 wires the real split-pane agent UI
-  return { output: "Agent pane opening... (full implementation in Task 9)", isError: false };
+  if (agentPane.isOpen) {
+    return { output: "Agent pane is already open.", isError: false };
+  }
+  await agentPane.open();
+  // Pane is now open — no overlay message needed (UI speaks for itself)
+  return { output: "", isError: false };
 }
 
 // ─── /exit ────────────────────────────────────────────────────────────────────
 
 export async function handleExit(_args: string[]): Promise<{ output: string; isError: boolean }> {
-  // Placeholder — Task 9 wires the real split-pane close logic
+  if (!agentPane.isOpen) {
+    return { output: "Agent pane is not open.", isError: false };
+  }
+  agentPane.close();
   return { output: "Agent pane closed.", isError: false };
 }
 

@@ -120,6 +120,14 @@ listen<{ path: string }>("cwd-changed", (event) => {
   console.warn("cwd-changed (main) listener failed:", err);
 });
 
+// ─── Theme applied — force grid redraw so colour changes take effect immediately
+
+listen("theme-applied", () => {
+  grid.forceRedraw();
+}).catch((err) => {
+  console.warn("theme-applied listener failed:", err);
+});
+
 // ─── Terminal I/O ─────────────────────────────────────────────────────────────
 
 let clickableTimer = 0;

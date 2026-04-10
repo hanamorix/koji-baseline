@@ -8,7 +8,8 @@ pub mod pty;
 pub mod terminal;
 
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use tauri::{Emitter, State};
 use tokio::sync::Mutex as AsyncMutex;
 
@@ -43,11 +44,11 @@ fn init_terminal(
 
     // Seat both in state
     {
-        let mut lock = pty_state.0.lock().unwrap();
+        let mut lock = pty_state.0.lock();
         *lock = Some(manager);
     }
     {
-        let mut lock = engine_state.0.lock().unwrap();
+        let mut lock = engine_state.0.lock();
         *lock = Some(engine);
     }
 
@@ -59,6 +60,7 @@ fn init_terminal(
         let mut buf = [0u8; 4096];
         loop {
             let n = {
+                // reader_arc is a std::sync::Mutex from pty.rs — .lock() returns Result
                 let mut reader = reader_arc.lock().unwrap();
                 match reader.read(&mut buf) {
                     Ok(0) => break,  // EOF — shell exited
@@ -68,7 +70,7 @@ fn init_terminal(
             };
 
             let snapshot = {
-                let mut eng_opt = engine_arc.lock().unwrap();
+                let mut eng_opt = engine_arc.lock();
                 if let Some(ref mut eng) = *eng_opt {
                     eng.process_bytes(&buf[..n]);
                     Some(eng.snapshot())
@@ -90,7 +92,7 @@ fn init_terminal(
 /// Send raw bytes to the shell — keypresses, paste, escape sequences, whatever.
 #[tauri::command]
 fn write_to_pty(data: Vec<u8>, state: State<'_, PtyState>) -> Result<(), String> {
-    let lock = state.0.lock().unwrap();
+    let lock = state.0.lock();
     match lock.as_ref() {
         Some(mgr) => mgr.write(&data).map_err(|e| format!("PTY write failed: {e}")),
         None => Err("PTY not initialised — call init_terminal first".into()),
@@ -107,14 +109,14 @@ fn resize_terminal(
 ) -> Result<(), String> {
     // Resize the terminal engine
     {
-        let mut eng_opt = engine_state.0.lock().unwrap();
+        let mut eng_opt = engine_state.0.lock();
         if let Some(ref mut eng) = *eng_opt {
             eng.resize(rows as usize, cols as usize);
         }
     }
     // Resize the PTY — signals the child process too
     {
-        let pty_lock = pty_state.0.lock().unwrap();
+        let pty_lock = pty_state.0.lock();
         if let Some(ref mgr) = *pty_lock {
             mgr.resize(rows, cols)?;
         }
@@ -241,15 +243,18 @@ fn open_file(path: String) -> Result<(), String> {
 
 /// Update the terminal engine's colour mapping at runtime.
 /// `colors` is a JSON object of { "black": [r,g,b], "red": [r,g,b], … }
+/// Emits "theme-applied" so the frontend can force a grid redraw.
 #[tauri::command]
 fn set_theme_colors(
     colors: serde_json::Value,
     engine_state: State<'_, EngineState>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let mut lock = engine_state.0.lock().unwrap();
+    let mut lock = engine_state.0.lock();
     if let Some(ref mut eng) = *lock {
         eng.set_theme_colors(&colors);
     }
+    let _ = app.emit("theme-applied", ());
     Ok(())
 }
 

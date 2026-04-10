@@ -68,22 +68,33 @@ fn named_to_rgb_default(name: NamedColor) -> [u8; 3] {
     }
 }
 
-/// Resolve a NamedColor against a theme override map, falling back to Wallace defaults.
-fn named_to_rgb(name: NamedColor, overrides: &HashMap<String, [u8; 3]>) -> [u8; 3] {
-    // Map NamedColor variants to the canonical key names used in TerminalColors
-    let key: &str = match name {
+/// Map any NamedColor variant to its canonical override key string.
+/// Bright/Dim variants all collapse to the same base key so theme overrides
+/// apply uniformly regardless of how the terminal emits the colour.
+fn named_color_key(name: NamedColor) -> &'static str {
+    match name {
         NamedColor::Black | NamedColor::DimBlack => "black",
         NamedColor::Red | NamedColor::BrightRed | NamedColor::DimRed => "red",
         NamedColor::Green | NamedColor::BrightGreen | NamedColor::DimGreen => "green",
-        NamedColor::Yellow | NamedColor::BrightYellow | NamedColor::DimYellow | NamedColor::BrightBlack => "yellow",
+        NamedColor::Yellow
+        | NamedColor::BrightYellow
+        | NamedColor::DimYellow
+        | NamedColor::BrightBlack => "yellow",
         NamedColor::Blue | NamedColor::BrightBlue | NamedColor::DimBlue => "blue",
         NamedColor::Magenta | NamedColor::BrightMagenta | NamedColor::DimMagenta => "magenta",
         NamedColor::Cyan | NamedColor::BrightCyan | NamedColor::DimCyan => "cyan",
         NamedColor::White | NamedColor::BrightWhite | NamedColor::DimWhite => "white",
-        NamedColor::Foreground | NamedColor::BrightForeground | NamedColor::DimForeground => "foreground",
+        NamedColor::Foreground | NamedColor::BrightForeground | NamedColor::DimForeground => {
+            "foreground"
+        }
         NamedColor::Background => "background",
         NamedColor::Cursor => "cursor",
-    };
+    }
+}
+
+/// Resolve a NamedColor against a theme override map, falling back to Wallace defaults.
+fn named_to_rgb(name: NamedColor, overrides: &HashMap<String, [u8; 3]>) -> [u8; 3] {
+    let key = named_color_key(name);
     overrides.get(key).copied().unwrap_or_else(|| named_to_rgb_default(name))
 }
 

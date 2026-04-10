@@ -115,6 +115,11 @@ export class TerminalGrid {
     return this.clickableRegions;
   }
 
+  /** Force an immediate redraw from the last snapshot — used after theme changes. */
+  forceRedraw(): void {
+    if (this.lastSnapshot) this.drawGrid(this.lastSnapshot);
+  }
+
   /**
    * Update the hovered region, flip the cursor style on the canvas element,
    * and trigger an immediate redraw so the underline appears / disappears.

@@ -1,6 +1,7 @@
 // status-bar.ts — Wallace dashboard initialiser
 // Wires: era clock, system-stats events → CPU/MEM display elements.
 // Also exports the last-seen CPU percent so waveform.ts can read it.
+// Task 13: listens for "cwd-changed" → updates path, git branch, git status.
 
 import { listen } from "@tauri-apps/api/event";
 import { startClock } from "./clock";
@@ -12,6 +13,12 @@ interface SystemStats {
   cpu_percent: f32;
   mem_used_gb: f32;
   mem_total_gb: f32;
+}
+
+interface CwdInfo {
+  path: string;
+  git_branch: string | null;
+  git_status: string | null;
 }
 
 // TypeScript doesn't know f32 — alias it
@@ -39,5 +46,20 @@ export function initDashboard(): void {
     if (memEl)  memEl.textContent  = `${mem_used_gb.toFixed(1)}G`;
   }).catch((err) => {
     console.warn("system-stats listener failed:", err);
+  });
+
+  // ── CWD + git status ─────────────────────────────────────────────────────
+  const cwdPathEl    = document.getElementById("cwd-path");
+  const gitBranchEl  = document.getElementById("git-branch");
+  const gitStatusEl  = document.getElementById("git-status");
+
+  listen<CwdInfo>("cwd-changed", (event) => {
+    const { path, git_branch, git_status } = event.payload;
+
+    if (cwdPathEl)   cwdPathEl.textContent   = path;
+    if (gitBranchEl) gitBranchEl.textContent = git_branch ?? "";
+    if (gitStatusEl) gitStatusEl.textContent = git_status ?? "";
+  }).catch((err) => {
+    console.warn("cwd-changed listener failed:", err);
   });
 }

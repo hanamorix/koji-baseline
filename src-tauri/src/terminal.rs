@@ -6,6 +6,7 @@ use alacritty_terminal::event::VoidListener;
 use alacritty_terminal::grid::Dimensions;
 use alacritty_terminal::index::{Column, Line};
 use alacritty_terminal::term::Config as TermConfig;
+use alacritty_terminal::term::TermMode;
 use alacritty_terminal::term::test::TermSize;
 use alacritty_terminal::vte::ansi::{Color, NamedColor, Processor, Rgb};
 use alacritty_terminal::term::cell::Flags;
@@ -37,6 +38,7 @@ pub struct GridSnapshot {
     pub cursor: CursorPos,
     pub rows: usize,
     pub cols: usize,
+    pub is_alt_screen: bool,
 }
 
 // ─── Named colour palette ──────────────────────────────────────────────────
@@ -257,6 +259,7 @@ impl TerminalEngine {
             cursor: CursorPos { row: cursor_row, col: cursor_col },
             rows: self.rows,
             cols: self.cols,
+            is_alt_screen: self.term.mode().contains(TermMode::ALT_SCREEN),
         }
     }
 

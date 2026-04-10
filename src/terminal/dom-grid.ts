@@ -22,6 +22,7 @@ export interface GridSnapshot {
   cursor: CursorPos;
   rows: number;
   cols: number;
+  is_alt_screen: boolean;
 }
 
 interface RowState {
@@ -95,6 +96,7 @@ export class DOMGrid {
   private pendingSnapshot: GridSnapshot | null = null;
   private rafPending = false;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
+  private inAltScreen = false;
   private autoScroll = true;
   private fontFamily = "'JetBrains Mono', 'Apple Color Emoji', 'Hiragino Sans', 'Noto Sans CJK SC', monospace";
   private fontSize = 14;
@@ -231,6 +233,7 @@ export class DOMGrid {
       const el = document.createElement("div");
       el.className = "grid-row";
       el.innerHTML = buildRowHTML(cells);
+      if (this.inAltScreen) el.style.display = "none";
 
       // Insert before the first viewport row
       if (this.viewportRows.length > 0) {
@@ -278,6 +281,14 @@ export class DOMGrid {
 
   private renderImmediate(snapshot: GridSnapshot): void {
     this.lastSnapshot = snapshot;
+
+    // Alt screen toggle — hide/show scrollback
+    if (snapshot.is_alt_screen !== this.inAltScreen) {
+      this.inAltScreen = snapshot.is_alt_screen;
+      for (const row of this.scrollbackRows) {
+        row.style.display = this.inAltScreen ? "none" : "";
+      }
+    }
 
     // Ensure correct row count
     if (this.viewportRows.length !== snapshot.rows) {

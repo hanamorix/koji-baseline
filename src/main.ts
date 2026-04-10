@@ -1,6 +1,8 @@
 // main.ts — Koji terminal frontend
 // PTY → engine → event → Canvas. Keyboard → ANSI → write_to_pty.
-// Task 9: >> prefix routes to Ollama; commandHistory tracks shell I/O for context.
+// Task 9:  >> prefix routes to Ollama; commandHistory tracks shell I/O for context.
+// Task 11: ASCII boot sequence.
+// Task 12: Idle animations + transition effects.
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -9,6 +11,9 @@ import { initDashboard } from "./dashboard/status-bar";
 import { WaveformAnimator } from "./animation/waveform";
 import { LlmPanel } from "./llm/panel";
 import { commandHistory } from "./llm/context";
+import { BootSequence } from "./ascii/boot";
+import { IdleAnimator } from "./ascii/idle";
+import { TransitionEffects } from "./animation/effects";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -26,7 +31,47 @@ listen<{ cpu_percent: number }>("system-stats", (event) => {
 const container = document.getElementById("terminal-container");
 if (!container) throw new Error("#terminal-container not found");
 
+// ─── ASCII Boot Sequence ──────────────────────────────────────────────────────
+
+const bootCanvas = document.createElement("canvas");
+bootCanvas.width  = container.clientWidth;
+bootCanvas.height = container.clientHeight;
+bootCanvas.style.display = "block";
+container.appendChild(bootCanvas);
+
+const boot = new BootSequence(bootCanvas);
+await boot.play();
+container.removeChild(bootCanvas);
+
+// ─── Terminal grid ────────────────────────────────────────────────────────────
+
 const grid = new TerminalGrid(container);
+
+// ─── Idle animator ────────────────────────────────────────────────────────────
+
+const idleAnimator = new IdleAnimator();
+
+// Feed the terminal canvas to the idle animator once the grid exposes it.
+// TerminalGrid renders to a <canvas> it owns inside `container`.
+const termCanvas = container.querySelector("canvas");
+if (termCanvas) idleAnimator.setCanvas(termCanvas as HTMLCanvasElement);
+
+// Kanji icon — status bar element id: "idle-icon" (added by status-bar if present)
+idleAnimator.onStateChange((idle) => {
+  const iconEl = document.getElementById("idle-icon");
+  if (!iconEl) return;
+  iconEl.textContent = idle ? idleAnimator.getCurrentKanji() : "光";
+});
+
+idleAnimator.start();
+
+// ─── Transition effects ───────────────────────────────────────────────────────
+
+let effects: TransitionEffects | null = null;
+const effectCanvas = container.querySelector("canvas");
+if (effectCanvas) {
+  effects = new TransitionEffects(effectCanvas as HTMLCanvasElement);
+}
 
 // ─── LLM setup ───────────────────────────────────────────────────────────────
 
@@ -83,14 +128,16 @@ window.addEventListener("keydown", (event) => {
       if (line.startsWith(">>")) {
         // ── LLM query — don't send to PTY ──
         event.preventDefault();
+        effects?.commandSubmit();
         llm.query(line).catch((err) => console.error("llm.query failed:", err));
         currentInput = "";
         return;
       }
 
-      // Regular shell command — record it for context
+      // Regular shell command — record it for context, fire submit effect
       if (line.length > 0) {
         commandHistory.addCommand(line);
+        effects?.commandSubmit();
       }
       currentInput = "";
     } else if (key === "Backspace") {

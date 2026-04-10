@@ -1,0 +1,28 @@
+// logo.ts — Kōji Baseline ASCII art + boot message constants
+
+export const KOJI_LOGO = `
+    ██╗  ██╗ ██████╗      ██╗██╗
+    ██║ ██╔╝██╔═══██╗     ██║██║
+    █████╔╝ ██║   ██║     ██║██║
+    ██╔═██╗ ██║   ██║██   ██║██║
+    ██║  ██╗╚██████╔╝╚█████╔╝██║
+    ╚═╝  ╚═╝ ╚═════╝  ╚════╝ ╚═╝
+
+    ██████╗  █████╗ ███████╗███████╗██╗     ██╗███╗   ██╗███████╗
+    ██╔══██╗██╔══██╗██╔════╝██╔════╝██║     ██║████╗  ██║██╔════╝
+    ██████╔╝███████║███████╗█████╗  ██║     ██║██╔██╗ ██║█████╗
+    ██╔══██╗██╔══██║╚════██║██╔══╝  ██║     ██║██║╚██╗██║██╔══╝
+    ██████╔╝██║  ██║███████║███████╗███████╗██║██║ ╚████║███████╗
+    ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝╚══════╝`;
+
+export const BOOT_MESSAGES: string[] = [
+  "[SYS] Initializing Kōji Baseline v0.1.0...",
+  "[PTY] Shell detected: /bin/zsh",
+  "[NET] Ollama connection: established",
+  "[MON] System monitor: active",
+  "[GPU] Renderer: Canvas 2D",
+  "[SYS] Baseline test: PASS",
+  "",
+  "Within cells interlinked.",
+  "",
+];

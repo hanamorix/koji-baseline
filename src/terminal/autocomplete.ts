@@ -95,9 +95,14 @@ export class Autocomplete {
     this.maybePathComplete(input);
   }
 
-  /** Navigate dropdown. Returns true if handled. */
+  /** Navigate suggestions. Shows dropdown if hidden. Returns true if handled. */
   navigate(delta: number): boolean {
-    if (!this.dropdownVisible || this.suggestions.length === 0) return false;
+    if (this.suggestions.length === 0) return false;
+
+    // Show dropdown if it wasn't visible yet (e.g. single suggestion, user pressed arrow)
+    if (!this.dropdownVisible && this.suggestions.length > 0) {
+      this.showDropdown();
+    }
 
     this.selectedIndex += delta;
     if (this.selectedIndex < 0) this.selectedIndex = this.suggestions.length - 1;
@@ -111,6 +116,11 @@ export class Autocomplete {
 
     this.renderDropdown();
     return true;
+  }
+
+  /** Check if there are any suggestions available (for arrow key interception). */
+  hasSuggestions(): boolean {
+    return this.suggestions.length > 0;
   }
 
   /** Accept the current suggestion. Returns the full text or empty. */

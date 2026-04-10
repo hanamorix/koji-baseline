@@ -41,6 +41,8 @@
   --koji-error:   #ff4500;
   --koji-success: #3a6a3a;
   --koji-glow:    rgba(255, 106, 0, 0.3);
+  --koji-panel:   rgba(15, 15, 15, 0.96);
+  --koji-highlight: rgba(255, 140, 0, 0.12);
 }
 
 /* ─── Reset ─────────────────────────────────────────────────────────────────── */
@@ -700,7 +702,7 @@ html, body {
 .suggest-dropdown {
   position: absolute;
   z-index: 10;
-  background: rgba(15, 15, 15, 0.96);
+  background: var(--koji-panel, rgba(15, 15, 15, 0.96));
   border: 1px solid var(--koji-dim);
   border-radius: 4px;
   max-height: 200px;
@@ -723,7 +725,7 @@ html, body {
 
 .suggest-item:hover,
 .suggest-item.selected {
-  background: rgba(255, 140, 0, 0.12);
+  background: var(--koji-highlight);
 }
 
 .suggest-icon {
@@ -796,7 +798,7 @@ html, body {
   top: 8px;
   right: 8px;
   z-index: 20;
-  background: rgba(15, 15, 15, 0.96);
+  background: var(--koji-panel, rgba(15, 15, 15, 0.96));
   border: 1px solid var(--koji-dim);
   border-radius: 4px;
   padding: 6px 10px;

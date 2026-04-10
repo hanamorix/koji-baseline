@@ -244,6 +244,19 @@ window.addEventListener("keydown", async (event) => {
     return;
   }
 
+  // ── Cmd+A — select all terminal text ──────────────────────────────────
+  if (metaKey && key === "a") {
+    event.preventDefault();
+    const sel = window.getSelection();
+    if (sel) {
+      const range = document.createRange();
+      range.selectNodeContents(domGrid.getScrollElement());
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    return;
+  }
+
   // ── Cmd+V — paste from clipboard with bracketed paste escapes ───────────
   if (metaKey && key === "v") {
     event.preventDefault();
@@ -289,7 +302,7 @@ window.addEventListener("keydown", async (event) => {
     }
     return;
   }
-  if ((key === "ArrowDown" || key === "ArrowUp") && autocomplete.isDropdownOpen()) {
+  if ((key === "ArrowDown" || key === "ArrowUp") && autocomplete.hasSuggestions()) {
     event.preventDefault();
     autocomplete.navigate(key === "ArrowDown" ? 1 : -1);
     return;

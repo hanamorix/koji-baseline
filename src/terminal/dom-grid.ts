@@ -87,6 +87,8 @@ export class DOMGrid {
   private gridEl: HTMLDivElement;
   private scrollEl: HTMLDivElement;
   private viewportRows: RowState[] = [];
+  private scrollbackRows: HTMLDivElement[] = [];
+  private maxScrollback = 10000;
   private cursorRow = -1;
   private cursorCol = -1;
   private lastSnapshot: GridSnapshot | null = null;
@@ -209,6 +211,34 @@ export class DOMGrid {
   destroy(): void {
     this.gridEl.remove();
     if (this.scrollbarTimer) clearTimeout(this.scrollbarTimer);
+  }
+
+  /** Append scrollback rows above the viewport. Called when lines scroll off the top. */
+  appendScrollback(rows: RenderCell[][]): void {
+    for (const cells of rows) {
+      const el = document.createElement("div");
+      el.className = "grid-row";
+      el.innerHTML = buildRowHTML(cells);
+
+      // Insert before the first viewport row
+      if (this.viewportRows.length > 0) {
+        this.scrollEl.insertBefore(el, this.viewportRows[0].el);
+      } else {
+        this.scrollEl.appendChild(el);
+      }
+
+      this.scrollbackRows.push(el);
+    }
+
+    // Trim oldest scrollback if over limit
+    while (this.scrollbackRows.length > this.maxScrollback) {
+      const oldest = this.scrollbackRows.shift()!;
+      oldest.remove();
+    }
+  }
+
+  setMaxScrollback(lines: number): void {
+    this.maxScrollback = lines;
   }
 
   // ── Private ─────────────────────────────────────────────────────────────

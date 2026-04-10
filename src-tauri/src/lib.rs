@@ -71,15 +71,22 @@ fn init_terminal(
                 }
             };
 
-            let snapshot = {
+            let (snapshot, scrollback) = {
                 let mut eng_opt = engine_arc.lock();
                 if let Some(ref mut eng) = *eng_opt {
                     eng.process_bytes(&buf[..n]);
-                    Some(eng.snapshot())
+                    let sb = eng.drain_scrollback();
+                    (Some(eng.snapshot()), sb)
                 } else {
-                    None
+                    (None, Vec::new())
                 }
             };
+
+            // Emit new scrollback lines before the viewport snapshot so the
+            // frontend can prepend them before the grid repaints.
+            if !scrollback.is_empty() {
+                let _ = app.emit("scrollback-append", &scrollback);
+            }
 
             if let Some(snap) = snapshot {
                 // Fire and forget — if the window closed, we'll catch it next iteration

@@ -3,6 +3,7 @@
 
 use alacritty_terminal::Term;
 use alacritty_terminal::event::VoidListener;
+use alacritty_terminal::grid::Dimensions;
 use alacritty_terminal::index::{Column, Line};
 use alacritty_terminal::term::Config as TermConfig;
 use alacritty_terminal::term::test::TermSize;
@@ -186,6 +187,8 @@ pub struct TerminalEngine {
     /// Runtime theme overrides — maps colour key (e.g. "red") → RGB triple.
     /// Empty = use Wallace defaults. Populated by set_theme_colors().
     pub color_overrides: HashMap<String, [u8; 3]>,
+    /// Tracks how many history lines existed at the last drain_scrollback() call.
+    prev_history_len: usize,
 }
 
 impl TerminalEngine {
@@ -195,7 +198,7 @@ impl TerminalEngine {
         let term = Term::new(config, &size, VoidListener);
         let parser = Processor::new();
 
-        Self { term, parser, rows, cols, color_overrides: HashMap::new() }
+        Self { term, parser, rows, cols, color_overrides: HashMap::new(), prev_history_len: 0 }
     }
 
     /// Apply a theme colour map from a JSON value (object of key → [r, g, b]).
@@ -263,5 +266,42 @@ impl TerminalEngine {
         self.cols = cols;
         let size = TermSize::new(cols, rows);
         self.term.resize(size);
+    }
+
+    /// Return any new scrollback lines since the last call.
+    /// Lines that scrolled off the top of the viewport into history are captured
+    /// and returned as Vec<Vec<RenderCell>> so the frontend can prepend them.
+    pub fn drain_scrollback(&mut self) -> Vec<Vec<RenderCell>> {
+        let grid = self.term.grid();
+        let history_len = grid.history_size();
+
+        if history_len <= self.prev_history_len {
+            self.prev_history_len = history_len;
+            return Vec::new();
+        }
+
+        let new_count = history_len - self.prev_history_len;
+        let mut result = Vec::with_capacity(new_count);
+
+        // History lines are accessed via negative Line indices.
+        // Line(-(history_len as i32)) is the oldest line in history.
+        // The newly added lines are the ones closest to the viewport top,
+        // i.e. at indices -(new_count) .. -1 relative to viewport.
+        // But we want them in chronological order (oldest new line first),
+        // which is -(new_count) up to -1.
+        for i in (1..=new_count).rev() {
+            let line = Line(-(i as i32));
+            let row_data = &grid[line];
+            let mut cells = Vec::with_capacity(self.cols);
+            for col_idx in 0..self.cols {
+                let col = Column(col_idx);
+                let cell = &row_data[col];
+                cells.push(cell_to_render(cell, &self.color_overrides));
+            }
+            result.push(cells);
+        }
+
+        self.prev_history_len = history_len;
+        result
     }
 }

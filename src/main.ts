@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { DOMGrid } from "./terminal/dom-grid";
-import type { GridSnapshot } from "./terminal/dom-grid";
+import type { GridSnapshot, RenderCell } from "./terminal/dom-grid";
 import { initDashboard } from "./dashboard/status-bar";
 import { LlmPanel } from "./llm/panel";
 import { commandHistory } from "./llm/context";
@@ -117,6 +117,12 @@ listen<GridSnapshot>("terminal-output", (event) => {
   domGrid.render(event.payload);
 }).catch((err) => {
   console.warn("terminal-output listener failed:", err);
+});
+
+listen<RenderCell[][]>("scrollback-append", (event) => {
+  domGrid.appendScrollback(event.payload);
+}).catch((err) => {
+  console.warn("scrollback-append listener failed:", err);
 });
 
 // Dynamic initial size based on container dimensions
@@ -248,6 +254,33 @@ window.addEventListener("keydown", async (event) => {
       if (currentInput.length === 1 && overlay.isActive) {
         overlay.dismiss();
       }
+    }
+  }
+
+  // Scroll shortcuts (Shift + navigation keys)
+  if (event.shiftKey) {
+    if (key === "PageUp") {
+      event.preventDefault();
+      const scrollEl = domGrid.getScrollElement();
+      scrollEl.scrollBy({ top: -scrollEl.clientHeight, behavior: "smooth" });
+      return;
+    }
+    if (key === "PageDown") {
+      event.preventDefault();
+      const scrollEl = domGrid.getScrollElement();
+      scrollEl.scrollBy({ top: scrollEl.clientHeight, behavior: "smooth" });
+      return;
+    }
+    if (key === "Home") {
+      event.preventDefault();
+      domGrid.getScrollElement().scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (key === "End") {
+      event.preventDefault();
+      const scrollEl = domGrid.getScrollElement();
+      scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: "smooth" });
+      return;
     }
   }
 

@@ -97,20 +97,29 @@ fn write_to_pty(data: Vec<u8>, state: State<'_, PtyState>) -> Result<(), String>
     }
 }
 
-/// Resize both the TerminalEngine. Call this when the window resizes.
+/// Resize both the TerminalEngine and the PTY. Call this when the window resizes.
 #[tauri::command]
 fn resize_terminal(
     rows: u16,
     cols: u16,
+    pty_state: State<'_, PtyState>,
     engine_state: State<'_, EngineState>,
 ) -> Result<(), String> {
-    let mut eng_opt = engine_state.0.lock().unwrap();
-    if let Some(ref mut eng) = *eng_opt {
-        eng.resize(rows as usize, cols as usize);
-        Ok(())
-    } else {
-        Err("Terminal engine not initialised".into())
+    // Resize the terminal engine
+    {
+        let mut eng_opt = engine_state.0.lock().unwrap();
+        if let Some(ref mut eng) = *eng_opt {
+            eng.resize(rows as usize, cols as usize);
+        }
     }
+    // Resize the PTY — signals the child process too
+    {
+        let pty_lock = pty_state.0.lock().unwrap();
+        if let Some(ref mgr) = *pty_lock {
+            mgr.resize(rows, cols)?;
+        }
+    }
+    Ok(())
 }
 
 // ─── Ollama Commands ──────────────────────────────────────────────────────────

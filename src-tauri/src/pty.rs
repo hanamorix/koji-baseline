@@ -1,11 +1,13 @@
 // pty.rs — PTY Manager: spawn a shell, pipe I/O like a feral systems engineer
 // no hand-holding, no apologies. just raw bytes and a very patient zsh.
+// Task 14: master handle stored for resize — because windows change shape, deal with it.
 
-use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
+use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
 pub struct PtyManager {
+    master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     master_writer: Arc<Mutex<Box<dyn Write + Send>>>,
     master_reader: Arc<Mutex<Box<dyn Read + Send>>>,
 }
@@ -46,6 +48,7 @@ impl PtyManager {
         let writer = pair.master.take_writer()?;
 
         Ok(Self {
+            master: Arc::new(Mutex::new(pair.master)),
             master_writer: Arc::new(Mutex::new(writer)),
             master_reader: Arc::new(Mutex::new(reader)),
         })
@@ -55,6 +58,19 @@ impl PtyManager {
     pub fn write(&self, data: &[u8]) -> std::io::Result<()> {
         let mut writer = self.master_writer.lock().unwrap();
         writer.write_all(data)
+    }
+
+    /// Resize the PTY — poke the kernel, signal the child. Called on window resize.
+    pub fn resize(&self, rows: u16, cols: u16) -> Result<(), String> {
+        let master = self.master.lock().unwrap();
+        master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("PTY resize failed: {e}"))
     }
 
     /// Hand off a clone of the reader Arc — caller spins an I/O thread with this.

@@ -108,17 +108,58 @@ listen<GridSnapshot>("terminal-output", (event) => {
   grid.render(event.payload);
 });
 
-invoke("init_terminal", { rows: 24, cols: 80 }).catch((err) => {
+// Dynamic initial size based on container dimensions
+const initCols = Math.max(1, Math.floor(container.clientWidth / 9));
+const initRows = Math.max(1, Math.floor(container.clientHeight / 18));
+invoke("init_terminal", { rows: initRows, cols: initCols }).catch((err) => {
   console.error("init_terminal failed:", err);
 });
+
+// ─── Resize observer — grid adapts to window ─────────────────────────────────
+
+const resizeObserver = new ResizeObserver((entries) => {
+  for (const entry of entries) {
+    const { width, height } = entry.contentRect;
+    const cols = Math.floor(width / 9);   // CELL_WIDTH  = 9px
+    const rows = Math.floor(height / 18); // CELL_HEIGHT = 18px
+    if (cols > 0 && rows > 0) {
+      grid.resize(rows, cols);
+      invoke("resize_terminal", { rows, cols }).catch((err) => {
+        console.warn("resize_terminal failed:", err);
+      });
+    }
+  }
+});
+resizeObserver.observe(container);
 
 // ─── Keyboard input ───────────────────────────────────────────────────────────
 
 // Track what the user is currently typing so we can capture full commands
 let currentInput = "";
 
-window.addEventListener("keydown", (event) => {
-  const { key, ctrlKey } = event;
+window.addEventListener("keydown", async (event) => {
+  const { key, ctrlKey, metaKey } = event;
+
+  // ── Cmd+V — paste from clipboard ─────────────────────────────────────────
+  if (metaKey && key === "v") {
+    event.preventDefault();
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        const bytes = Array.from(new TextEncoder().encode(text));
+        await invoke("write_to_pty", { data: bytes });
+      }
+    } catch {
+      // Clipboard read denied or empty — silent fail
+    }
+    return;
+  }
+
+  // ── Cmd+C — selection not yet implemented, just swallow it ───────────────
+  if (metaKey && key === "c") {
+    event.preventDefault();
+    return;
+  }
 
   // Build up the current input line for context tracking
   if (!ctrlKey) {

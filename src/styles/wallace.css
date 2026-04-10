@@ -185,15 +185,12 @@ html, body {
 
 .terminal-viewport {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--koji-void);
-  overflow: hidden;
   position: relative;
+  overflow: hidden;
+  background: var(--koji-void);
 }
 
-/* Subtle ambient glow behind the canvas */
+/* Subtle ambient glow behind the terminal grid */
 .terminal-viewport::before {
   content: '';
   position: absolute;
@@ -205,12 +202,6 @@ html, body {
   );
   pointer-events: none;
   z-index: 0;
-}
-
-.terminal-viewport canvas {
-  position: relative;
-  z-index: 1;
-  display: block;
 }
 
 /* ─── Dashboard bottom ───────────────────────────────────────────────────────── */

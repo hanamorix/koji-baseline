@@ -1,7 +1,8 @@
 // router.ts — Slash command dispatcher
-// dispatchCommand("/foo bar baz") → Promise<CommandResult> | null
+// dispatchCommand("/foo bar baz") → Promise<DispatchResult> | null
 
-import { handleHelp, handleTheme, handleLlm, handleVersion } from "./handlers";
+import { handleHelp, handleTheme, handleLlm, handleVersion, handleAgent, handleExit } from "./handlers";
+import type { MenuItem } from "../overlay/menu";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -10,11 +11,21 @@ export interface CommandResult {
   isError: boolean;
 }
 
+export interface MenuResult {
+  type: "menu";
+  items: MenuItem[];
+  onSelect: (value: string) => Promise<void>;
+  onPreview?: (value: string) => void;
+  onCancel?: () => void;
+}
+
+export type DispatchResult = CommandResult | MenuResult;
+
 // ─── dispatchCommand ──────────────────────────────────────────────────────────
 // Returns null if the input isn't a recognised slash command.
 // Caller must check for null before awaiting.
 
-export function dispatchCommand(input: string): Promise<CommandResult> | null {
+export function dispatchCommand(input: string): Promise<DispatchResult> | null {
   // Must start with /
   if (!input.startsWith("/")) return null;
 
@@ -34,6 +45,12 @@ export function dispatchCommand(input: string): Promise<CommandResult> | null {
 
     case "llm":
       return handleLlm(rest);
+
+    case "agent":
+      return handleAgent(rest);
+
+    case "exit":
+      return handleExit(rest);
 
     default:
       // Unknown command — surface a helpful error rather than silent null

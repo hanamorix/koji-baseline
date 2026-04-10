@@ -17,6 +17,7 @@ import { IdleAnimator } from "./ascii/idle";
 import { TransitionEffects } from "./animation/effects";
 import { themeManager } from "./themes/manager";
 import { dispatchCommand } from "./commands/router";
+import type { CommandResult } from "./commands/router";
 import { overlay } from "./overlay/overlay";
 import { openMenu } from "./overlay/menu";
 import type { MenuResult } from "./overlay/menu";
@@ -247,10 +248,11 @@ window.addEventListener("keydown", async (event) => {
         const result = dispatchCommand(line);
         if (result) {
           const res = await result;
-          if ("type" in res && (res as unknown as MenuResult).type === "menu") {
-            openMenu(res as unknown as MenuResult);
+          if ("type" in res && (res as MenuResult).type === "menu") {
+            openMenu(res as MenuResult);
           } else {
-            overlay.showMessage(res.output, res.isError);
+            const cmd = res as CommandResult;
+            overlay.showMessage(cmd.output, cmd.isError);
           }
         }
         currentInput = "";

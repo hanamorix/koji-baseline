@@ -18,6 +18,8 @@ import { TransitionEffects } from "./animation/effects";
 import { themeManager } from "./themes/manager";
 import { dispatchCommand } from "./commands/router";
 import { overlay } from "./overlay/overlay";
+import { openMenu } from "./overlay/menu";
+import type { MenuResult } from "./overlay/menu";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -237,9 +239,8 @@ window.addEventListener("keydown", async (event) => {
         const result = dispatchCommand(line);
         if (result) {
           const res = await result;
-          if ("type" in res && res.type === "menu") {
-            // MenuResult — handled by menu component (Task 2)
-            overlay.dismiss();
+          if ("type" in res && (res as unknown as MenuResult).type === "menu") {
+            openMenu(res as unknown as MenuResult);
           } else {
             overlay.showMessage(res.output, res.isError);
           }

@@ -285,3 +285,61 @@ html, body {
 .overlay-message.streaming {
   border-left-color: var(--koji-orange);
 }
+
+/* ── Interactive menu ────────────────────────────────────────────────────────── */
+
+.overlay-menu {
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid var(--koji-dim);
+  border-radius: 3px;
+  padding: 4px 0;
+  max-height: 60%;
+  overflow-y: auto;
+}
+
+.overlay-menu .menu-filter {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--koji-deep);
+  color: var(--koji-muted);
+  font-size: 11px;
+}
+
+.overlay-menu .menu-filter input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--koji-warm);
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 12px;
+  width: 100%;
+}
+
+.menu-item {
+  padding: 4px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--koji-warm);
+  font-size: 12px;
+}
+
+.menu-item.highlighted {
+  background: var(--koji-deep);
+  color: var(--koji-bright);
+}
+
+.menu-item.active-marker::before {
+  content: '▶';
+  color: var(--koji-orange);
+  font-size: 10px;
+}
+
+.menu-item .menu-label {
+  flex: 1;
+}
+
+.menu-item .menu-desc {
+  color: var(--koji-muted);
+  font-size: 11px;
+}

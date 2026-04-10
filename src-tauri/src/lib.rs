@@ -4,6 +4,7 @@
 
 pub mod monitor;
 pub mod ollama;
+pub mod openai_compat;
 pub mod pty;
 pub mod terminal;
 
@@ -18,6 +19,7 @@ use tokio::sync::Mutex as AsyncMutex;
 struct PtyState(Arc<Mutex<Option<pty::PtyManager>>>);
 struct EngineState(Arc<Mutex<Option<terminal::TerminalEngine>>>);
 struct OllamaState(Arc<AsyncMutex<ollama::OllamaClient>>);
+struct OpenAICompatState(Arc<AsyncMutex<openai_compat::OpenAICompatClient>>);
 
 // ─── PTY Commands ─────────────────────────────────────────────────────────────
 
@@ -181,6 +183,35 @@ async fn ollama_pull_model(model: String, state: State<'_, OllamaState>) -> Resu
     client.pull_model(model).await
 }
 
+// ─── OpenAI-Compatible Commands ───────────────────────────────────────────────
+
+/// Stream a chat completion through an OpenAI-compatible provider.
+/// Accepts base_url, api_key, and model so any Together/Groq/Fireworks endpoint works.
+#[tauri::command]
+async fn openai_chat_stream(
+    base_url: String,
+    api_key: String,
+    model: String,
+    messages: Vec<openai_compat::OpenAIChatMessage>,
+    tools: Option<Vec<openai_compat::ToolDefinition>>,
+    app: tauri::AppHandle,
+    state: State<'_, OpenAICompatState>,
+) -> Result<(), String> {
+    let client = state.0.lock().await;
+    client.chat_stream(&base_url, &api_key, &model, messages, tools, &app).await
+}
+
+/// List models from an OpenAI-compatible /v1/models endpoint.
+#[tauri::command]
+async fn openai_list_models(
+    base_url: String,
+    api_key: String,
+    state: State<'_, OpenAICompatState>,
+) -> Result<Vec<String>, String> {
+    let client = state.0.lock().await;
+    client.list_models(&base_url, &api_key).await
+}
+
 // ─── Filesystem Commands ──────────────────────────────────────────────────────
 
 /// Resolve a path (expanding `~/`) and return whether it is a "file",
@@ -317,6 +348,9 @@ pub fn run() {
         .manage(OllamaState(Arc::new(AsyncMutex::new(
             ollama::OllamaClient::new(),
         ))))
+        .manage(OpenAICompatState(Arc::new(AsyncMutex::new(
+            openai_compat::OpenAICompatClient::new(),
+        ))))
         .invoke_handler(tauri::generate_handler![
             init_terminal,
             write_to_pty,
@@ -332,6 +366,8 @@ pub fn run() {
             check_path_type,
             open_url,
             open_file,
+            openai_chat_stream,
+            openai_list_models,
         ])
         .setup(|app| {
             monitor::start_monitor(app.handle().clone());

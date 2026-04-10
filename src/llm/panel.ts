@@ -56,6 +56,11 @@ export class LlmPanel {
       }
       try {
         await invoke("switch_model", { model: name });
+        await invoke("save_config", { key: "activeModel", value: name });
+        const modelEl = document.getElementById("llm-model");
+        const dotEl = document.getElementById("llm-dot");
+        if (modelEl) modelEl.textContent = name;
+        if (dotEl) dotEl.style.background = "#cc7a00";
         this.fire(`[llm] Switched to model: ${name}\n`, true);
       } catch (err) {
         this.fire(`[llm] switch_model failed: ${err}\n`, true);

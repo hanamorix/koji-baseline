@@ -109,6 +109,14 @@ export class LlmOnboarding {
 
         try {
           await invoke("switch_model", { model: modelName });
+          await invoke("save_config", { key: "activeModel", value: modelName });
+
+          // Update dashboard badge
+          const modelEl = document.getElementById("llm-model");
+          const dotEl = document.getElementById("llm-dot");
+          if (modelEl) modelEl.textContent = modelName;
+          if (dotEl) dotEl.style.background = "#cc7a00";
+
           overlay.showMessage(
             `● Ready!  model: ${modelName}\n\nType >> followed by your question, or /agent for the full agent.`,
             false,

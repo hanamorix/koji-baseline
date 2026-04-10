@@ -139,6 +139,11 @@ export async function handleLlm(args: string[]): Promise<{ output: string; isErr
         items,
         onSelect: async (value: string) => {
           await invoke("switch_model", { model: value });
+          await invoke("save_config", { key: "activeModel", value });
+          const modelEl = document.getElementById("llm-model");
+          const dotEl = document.getElementById("llm-dot");
+          if (modelEl) modelEl.textContent = value;
+          if (dotEl) dotEl.style.background = "#cc7a00";
         },
       };
 
@@ -156,6 +161,11 @@ export async function handleLlm(args: string[]): Promise<{ output: string; isErr
     }
     try {
       await invoke("switch_model", { model: modelName });
+      await invoke("save_config", { key: "activeModel", value: modelName });
+      const modelEl = document.getElementById("llm-model");
+      const dotEl = document.getElementById("llm-dot");
+      if (modelEl) modelEl.textContent = modelName;
+      if (dotEl) dotEl.style.background = "#cc7a00";
       return { output: `Active model → ${modelName}`, isError: false };
     } catch (e) {
       return { output: `Failed to switch model: ${e}`, isError: true };

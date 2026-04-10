@@ -219,6 +219,13 @@ window.addEventListener("keydown", async (event) => {
     return;
   }
 
+  // ── Ctrl+C / Escape — reset input tracking (shell will show new prompt) ─
+  if ((ctrlKey && key === "c") || key === "Escape") {
+    currentInput = "";
+    autocomplete.hide();
+    // Don't return — let it fall through to keyToAnsi to send to PTY
+  }
+
   // ── Right Arrow — accept autocomplete suggestion ─────────────────────────
   if (key === "ArrowRight" && autocomplete.getSuggestion()) {
     event.preventDefault();

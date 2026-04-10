@@ -28,6 +28,10 @@ export class BootSequence {
     this.canvas = canvas;
     this.ctx    = canvas.getContext("2d")!;
 
+    // Scale for Retina/HiDPI displays
+    const dpr = window.devicePixelRatio || 1;
+    this.ctx.scale(dpr, dpr);
+
     this.skipHandler = () => { this.skipped = true; };
     window.addEventListener("keydown",   this.skipHandler, { once: false });
     window.addEventListener("mousedown", this.skipHandler, { once: false });
@@ -40,10 +44,17 @@ export class BootSequence {
 
   // ── helpers ─────────────────────────────────────────────────────────────────
 
+  /** Logical canvas dimensions (context is already DPR-scaled) */
+  private get logicalWidth(): number {
+    return this.canvas.width / (window.devicePixelRatio || 1);
+  }
+  private get logicalHeight(): number {
+    return this.canvas.height / (window.devicePixelRatio || 1);
+  }
+
   private clear(): void {
-    const { ctx, canvas } = this;
-    ctx.fillStyle = BG;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    this.ctx.fillStyle = BG;
+    this.ctx.fillRect(0, 0, this.logicalWidth, this.logicalHeight);
   }
 
   private setFont(): void {
@@ -60,7 +71,7 @@ export class BootSequence {
     const lines  = KOJI_LOGO.split("\n");
     const startY = Math.max(
       LINE_HEIGHT * 2,
-      (canvas.height - lines.length * LINE_HEIGHT) / 2,
+      (this.logicalHeight - lines.length * LINE_HEIGHT) / 2,
     );
 
     // Render every character, 3-at-a-time with 5 ms delay between batches
@@ -108,8 +119,8 @@ export class BootSequence {
     let   msgY   = LINE_HEIGHT * 2 + logoLines * LINE_HEIGHT + LINE_HEIGHT;
 
     // If messages would overflow, scroll from top
-    if (msgY + BOOT_MESSAGES.length * LINE_HEIGHT > canvas.height) {
-      msgY = canvas.height - BOOT_MESSAGES.length * LINE_HEIGHT - LINE_HEIGHT * 2;
+    if (msgY + BOOT_MESSAGES.length * LINE_HEIGHT > this.logicalHeight) {
+      msgY = this.logicalHeight - BOOT_MESSAGES.length * LINE_HEIGHT - LINE_HEIGHT * 2;
     }
 
     for (let i = 0; i < BOOT_MESSAGES.length; i++) {
@@ -160,7 +171,7 @@ export class BootSequence {
         // Flavour line — full amber, centred-ish
         ctx.fillStyle = AMBER;
         const textW = ctx.measureText(raw).width;
-        const cx    = (canvas.width - textW) / 2;
+        const cx    = (this.logicalWidth - textW) / 2;
         ctx.fillText(raw, cx, msgY);
       }
 
@@ -176,7 +187,7 @@ export class BootSequence {
     for (let alpha = 0; alpha < 1; alpha += 0.05) {
       if (this.skipped) break;
       ctx.fillStyle = "rgba(10,10,10,0.05)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, this.logicalWidth, this.logicalHeight);
       await delay(16); // ~60fps
     }
     // Guarantee full black at the end

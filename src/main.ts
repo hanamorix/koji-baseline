@@ -34,8 +34,11 @@ if (!container) throw new Error("#terminal-container not found");
 // ─── ASCII Boot Sequence ──────────────────────────────────────────────────────
 
 const bootCanvas = document.createElement("canvas");
-bootCanvas.width  = container.clientWidth;
-bootCanvas.height = container.clientHeight;
+const bootDpr = window.devicePixelRatio || 1;
+bootCanvas.width  = container.clientWidth * bootDpr;
+bootCanvas.height = container.clientHeight * bootDpr;
+bootCanvas.style.width  = `${container.clientWidth}px`;
+bootCanvas.style.height = `${container.clientHeight}px`;
 bootCanvas.style.display = "block";
 container.appendChild(bootCanvas);
 

@@ -72,15 +72,18 @@ export class IdleAnimator {
     const ctx = this.canvas.getContext("2d");
     if (!ctx) return;
 
-    const { width, height } = this.canvas;
+    // Use logical dimensions (context is already DPR-scaled)
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth  = this.canvas.width / dpr;
+    const logicalHeight = this.canvas.height / dpr;
     const now    = Date.now();
     const elapsed = now - this.scanStartTime;
 
     // Full sweep in 3 s
-    this.scanY = ((elapsed / 3000) % 1) * height;
+    this.scanY = ((elapsed / 3000) % 1) * logicalHeight;
 
     ctx.fillStyle = "rgba(255,106,0,0.02)";
-    ctx.fillRect(0, this.scanY, width, 6);
+    ctx.fillRect(0, this.scanY, logicalWidth, 6);
   }
 
   // ── kanji cycling ────────────────────────────────────────────────────────────

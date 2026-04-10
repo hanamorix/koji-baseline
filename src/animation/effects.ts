@@ -13,9 +13,18 @@ export class TransitionEffects {
   // Brief horizontal scan-line sweep across the full canvas height.
   // Amber, 6% opacity, 4px stride.
 
+  /** Get logical canvas dimensions (context is already DPR-scaled) */
+  private logicalSize(): { width: number; height: number } {
+    const dpr = window.devicePixelRatio || 1;
+    return {
+      width:  this.canvas.width / dpr,
+      height: this.canvas.height / dpr,
+    };
+  }
+
   commandSubmit(): void {
-    const { ctx, canvas } = this;
-    const { width, height } = canvas;
+    const { ctx } = this;
+    const { width, height } = this.logicalSize();
 
     ctx.fillStyle = "rgba(255,106,0,0.06)";
     for (let y = 0; y < height; y += 4) {
@@ -39,10 +48,10 @@ export class TransitionEffects {
   // Fades from 8% → 0 opacity.
 
   commandComplete(startRow: number, endRow: number, cellHeight: number): void {
-    const { ctx, canvas } = this;
+    const { ctx } = this;
     const y      = startRow * cellHeight;
     const height = (endRow - startRow + 1) * cellHeight;
-    const width  = canvas.width;
+    const { width } = this.logicalSize();
 
     let alpha = 0.08;
     const pulse = () => {
@@ -59,10 +68,10 @@ export class TransitionEffects {
   // 4 quick red flickers over the error row range.
 
   errorFlicker(startRow: number, endRow: number, cellHeight: number): void {
-    const { ctx, canvas } = this;
+    const { ctx } = this;
     const y      = startRow * cellHeight;
     const height = (endRow - startRow + 1) * cellHeight;
-    const width  = canvas.width;
+    const { width } = this.logicalSize();
     const color  = "rgba(255,69,0,0.08)";
 
     let count = 0;

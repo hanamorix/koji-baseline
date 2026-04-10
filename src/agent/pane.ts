@@ -1,24 +1,34 @@
-// pane.ts — Agent split-pane UI
-// Manages the side-by-side terminal + agent conversation layout.
-// AgentSession drives the data; AgentPane owns the DOM.
+// pane.ts — Agent split-pane UI (v2)
+// LEFT:  Conversation — [User] and [Agent] messages, input at bottom
+//        User can also run shell commands with $ prefix
+// RIGHT: Workspace — read-only scrollable log of agent actions (tool calls, output)
+// AgentSession drives the data; AgentPane owns both panes.
 
 import { AgentSession, type AgentEvent } from "./agent";
 import { getActiveProvider } from "../providers/provider";
 import { invoke } from "@tauri-apps/api/core";
 
+// ─── ASCII art for User and Agent labels ─────────────────────────────────────
+
+const USER_GLYPH = "◆";
+const AGENT_GLYPH = "◇";
+
 export class AgentPane {
   private session: AgentSession | null = null;
-  private paneEl: HTMLDivElement | null = null;
-  private dividerEl: HTMLDivElement | null = null;
-  private conversationEl: HTMLDivElement | null = null;
+  private wrapperEl: HTMLDivElement | null = null;
+  private chatEl: HTMLDivElement | null = null;
+  private workspaceEl: HTMLDivElement | null = null;
   private inputEl: HTMLInputElement | null = null;
   private _isOpen = false;
 
-  // Track pending tool block element so we can update it on result
+  // Track pending tool block in workspace
   private pendingToolEl: HTMLDivElement | null = null;
 
-  // Capture-phase keydown handler — stored so we can remove it on close
+  // Capture-phase keydown handler
   private captureHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  // Original container children to restore on close
+  private originalChildren: Node[] = [];
 
   get isOpen(): boolean {
     return this._isOpen;
@@ -32,106 +42,95 @@ export class AgentPane {
     const container = document.getElementById("terminal-container");
     if (!container) throw new Error("#terminal-container not found");
 
-    // Make the viewport a flex row
-    container.style.display = "flex";
-    container.style.flexDirection = "row";
-    container.style.alignItems = "stretch";
+    // Save original children (canvas, overlay) to restore on close
+    this.originalChildren = Array.from(container.childNodes);
 
-    // Shrink the canvas to 60 % — calculate actual pixel dimensions so
-    // the canvas internal resolution matches the CSS display size (fixes DPI blur).
-    const canvas = container.querySelector("canvas");
-    if (canvas) {
-      (canvas as HTMLElement).style.flexShrink = "0";
-      const containerWidth = container.clientWidth;
-      const targetWidth = Math.max(Math.floor(containerWidth * 0.6), 400);
-      (canvas as HTMLElement).style.width = `${targetWidth}px`;
-
-      // Lazily import grid to avoid a circular dependency at module load time
-      import("../main").then(({ grid }) => {
-        const cols = Math.max(1, Math.floor(targetWidth / 9));    // CELL_WIDTH = 9
-        const rows = Math.max(1, Math.floor(container.clientHeight / 18)); // CELL_HEIGHT = 18
-        grid.resize(rows, cols);
-        invoke("resize_terminal", { rows, cols }).catch(console.warn);
-      }).catch(console.warn);
+    // Hide original terminal content
+    for (const child of this.originalChildren) {
+      if (child instanceof HTMLElement) child.style.display = "none";
     }
+
+    // ── Build the agent wrapper ──────────────────────────────────────────────
+    const wrapper = document.createElement("div");
+    wrapper.className = "agent-wrapper";
+    container.appendChild(wrapper);
+    this.wrapperEl = wrapper;
+
+    // ── LEFT: Conversation pane ──────────────────────────────────────────────
+    const chatPane = document.createElement("div");
+    chatPane.className = "agent-chat-pane";
+
+    // Chat header
+    const chatHeader = document.createElement("div");
+    chatHeader.className = "agent-chat-header";
+
+    let modelLabel = "agent";
+    try {
+      const provider = await getActiveProvider();
+      const model = await invoke<string>("load_config", { key: "activeModel" }).catch(() => "");
+      modelLabel = model || provider.name;
+    } catch {}
+
+    chatHeader.innerHTML = `<span class="agent-chat-title">${AGENT_GLYPH} Kōji Agent</span><span class="agent-chat-model">${modelLabel}</span>`;
+    chatPane.appendChild(chatHeader);
+
+    // Chat messages area
+    const chatMessages = document.createElement("div");
+    chatMessages.className = "agent-chat-messages";
+    chatPane.appendChild(chatMessages);
+    this.chatEl = chatMessages;
+
+    // Welcome message
+    this.appendAgentMsg("Welcome to Kōji Agent. Ask me anything, or type `$ command` to run a shell command directly.");
+
+    // Chat input area
+    const inputArea = document.createElement("div");
+    inputArea.className = "agent-chat-input-area";
+
+    const promptLabel = document.createElement("span");
+    promptLabel.className = "agent-chat-prompt";
+    promptLabel.textContent = `${USER_GLYPH}`;
+    inputArea.appendChild(promptLabel);
+
+    const input = document.createElement("input");
+    input.className = "agent-chat-input";
+    input.type = "text";
+    input.placeholder = "message the agent...";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    inputArea.appendChild(input);
+    this.inputEl = input;
+
+    chatPane.appendChild(inputArea);
+    wrapper.appendChild(chatPane);
 
     // ── Divider ──────────────────────────────────────────────────────────────
     const divider = document.createElement("div");
     divider.className = "agent-divider";
-    container.appendChild(divider);
-    this.dividerEl = divider;
+    wrapper.appendChild(divider);
 
-    // ── Agent pane ────────────────────────────────────────────────────────────
-    const pane = document.createElement("div");
-    pane.className = "agent-pane";
-    container.appendChild(pane);
-    this.paneEl = pane;
+    // ── RIGHT: Workspace pane ────────────────────────────────────────────────
+    const workspacePane = document.createElement("div");
+    workspacePane.className = "agent-workspace-pane";
 
-    // Build provider / model label
-    let headerLabel = "🤖 agent";
-    try {
-      const provider = await getActiveProvider();
-      // Try to grab model name from config (best-effort)
-      const model = await invoke<string>("load_config", { key: "activeModel" }).catch(() => "");
-      const providerName = provider.name;
-      headerLabel = `🤖 ${model || providerName} via ${providerName}`;
-    } catch {
-      // Silently fall back — header label stays generic
-    }
+    const wsHeader = document.createElement("div");
+    wsHeader.className = "agent-ws-header";
+    wsHeader.textContent = "⚙ Workspace";
+    workspacePane.appendChild(wsHeader);
 
-    // Header
-    const header = document.createElement("div");
-    header.className = "agent-header";
-    header.textContent = headerLabel;
-    pane.appendChild(header);
+    const wsLog = document.createElement("div");
+    wsLog.className = "agent-ws-log";
+    workspacePane.appendChild(wsLog);
+    this.workspaceEl = wsLog;
 
-    // Conversation area
-    const conv = document.createElement("div");
-    conv.className = "agent-conversation";
-    pane.appendChild(conv);
-    this.conversationEl = conv;
-
-    // Input area
-    const inputArea = document.createElement("div");
-    inputArea.className = "agent-input-area";
-
-    const promptLabel = document.createElement("span");
-    promptLabel.className = "prompt-label";
-    promptLabel.textContent = "you ›";
-    inputArea.appendChild(promptLabel);
-
-    const input = document.createElement("input");
-    input.className = "agent-input";
-    input.type = "text";
-    input.placeholder = "type a message…";
-    inputArea.appendChild(input);
-    this.inputEl = input;
-
-    pane.appendChild(inputArea);
+    wrapper.appendChild(workspacePane);
 
     // ── Session ───────────────────────────────────────────────────────────────
     const provider = await getActiveProvider();
     this.session = new AgentSession(provider);
     this.session.on((event) => this.handleEvent(event));
 
-    // ── Click-to-focus ────────────────────────────────────────────────────────
-    // Click agent pane → focus input, click terminal → blur input so global keydown takes over
-    pane.addEventListener("click", (e) => {
-      // Don't steal focus if clicking a button or other interactive element
-      if ((e.target as HTMLElement).tagName === "INPUT") return;
-      input.focus();
-    });
-
-    // Listen on the entire container — clicks on canvas, overlay, or divider all blur the agent input
-    container.addEventListener("click", (e) => {
-      const target = e.target as HTMLElement;
-      // Only blur if click landed outside the agent pane
-      if (!pane.contains(target)) {
-        input.blur();
-      }
-    });
-
-    // ── Input — send on Enter ─────────────────────────────────────────────────
+    // ── Input handling ────────────────────────────────────────────────────────
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -140,43 +139,28 @@ export class AgentPane {
       }
     });
 
-    // ── Capture-phase handler — intercept Enter/Escape for tool approval ──────
-    // Runs before the global keydown in main.ts so tool approval doesn't leak
-    // to the PTY.
+    // Capture-phase: intercept keys for tool approval when pending
     this.captureHandler = (e: KeyboardEvent) => {
-      if (!this.session) return;
-
-      // Only intercept when the pane input is focused and we have a pending tool
-      if (document.activeElement !== input) return;
-      if (!(this.session as unknown as { pendingToolApproval: unknown }).pendingToolApproval) {
-        // Access the private field through the resolveToolApproval path:
-        // We check by inspecting whether pendingToolEl exists (set when we render a tool block)
-        if (!this.pendingToolEl) return;
-      }
+      if (!this.pendingToolEl) return;
 
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        if (this.pendingToolEl) {
-          this.markToolApproved();
-          this.session!.resolveToolApproval(true);
-        }
+        this.markToolApproved();
+        this.session?.resolveToolApproval(true);
       } else if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        if (this.pendingToolEl) {
-          this.markToolRejected();
-          this.session!.resolveToolApproval(false);
-        }
+        this.markToolRejected();
+        this.session?.resolveToolApproval(false);
       }
     };
     window.addEventListener("keydown", this.captureHandler, { capture: true });
 
     this._isOpen = true;
-    input.focus();
 
-    // Replay any existing conversation history (if pane was re-opened)
-    // Nothing to replay on fresh session — history is empty.
+    // Focus the input
+    setTimeout(() => input.focus(), 50);
   }
 
   // ── Close ─────────────────────────────────────────────────────────────────
@@ -187,26 +171,21 @@ export class AgentPane {
     const container = document.getElementById("terminal-container");
     if (!container) return;
 
-    // Remove pane and divider
-    if (this.paneEl) container.removeChild(this.paneEl);
-    if (this.dividerEl) container.removeChild(this.dividerEl);
+    // Remove agent wrapper
+    if (this.wrapperEl) {
+      container.removeChild(this.wrapperEl);
+    }
 
-    // Restore canvas width — recalculate full dimensions after pane removal
+    // Restore original children
+    for (const child of this.originalChildren) {
+      if (child instanceof HTMLElement) child.style.display = "";
+    }
+
+    // Resize terminal back to full width
     const canvas = container.querySelector("canvas");
-
-    // Restore container layout first so clientWidth reflects full size
-    container.style.display = "";
-    container.style.flexDirection = "";
-    container.style.alignItems = "";
-
     if (canvas) {
-      (canvas as HTMLElement).style.width = "";
-      (canvas as HTMLElement).style.flexShrink = "";
-
-      // Resize grid back to full container
       import("../main").then(({ grid }) => {
-        const fullWidth = container.clientWidth;
-        const cols = Math.max(1, Math.floor(fullWidth / 9));
+        const cols = Math.max(1, Math.floor(container.clientWidth / 9));
         const rows = Math.max(1, Math.floor(container.clientHeight / 18));
         grid.resize(rows, cols);
         invoke("resize_terminal", { rows, cols }).catch(console.warn);
@@ -219,16 +198,12 @@ export class AgentPane {
       this.captureHandler = null;
     }
 
-    this.paneEl = null;
-    this.dividerEl = null;
-    this.conversationEl = null;
+    this.wrapperEl = null;
+    this.chatEl = null;
+    this.workspaceEl = null;
     this.inputEl = null;
     this.pendingToolEl = null;
     this._isOpen = false;
-
-    // NOTE: session is intentionally kept alive — AgentSession holds conversation
-    // history. Re-opening the pane will create a fresh session but the old one's
-    // history could be wired in here if needed later.
   }
 
   // ── Event handler ─────────────────────────────────────────────────────────
@@ -241,165 +216,237 @@ export class AgentPane {
 
       case "tool_request":
         if (event.toolCall) {
-          this.pendingToolEl = this.appendToolBlock(event.toolCall.function.name, event.toolCall.function.arguments);
+          // Tool requests go to BOTH panes:
+          // - Chat: brief note that agent is using a tool
+          // - Workspace: full tool block with details
+          this.appendAgentMsg(`Using tool: ${event.toolCall.function.name}...`);
+          this.pendingToolEl = this.appendWorkspaceTool(
+            event.toolCall.function.name,
+            event.toolCall.function.arguments,
+          );
         }
         break;
 
       case "tool_approved":
-        // Controls updated inline by markToolApproved
         break;
 
       case "tool_result":
         if (this.pendingToolEl && event.toolResult !== undefined) {
-          this.appendToolResult(this.pendingToolEl, event.toolResult);
+          this.appendWorkspaceResult(this.pendingToolEl, event.toolResult);
           this.pendingToolEl = null;
         }
         break;
 
       case "tool_rejected":
-        // markToolRejected already updated the block
         this.pendingToolEl = null;
         break;
 
       case "done":
-        // Seal the last streaming bubble
         this.sealStreamBubble();
         break;
 
       case "error":
-        this.appendError(event.content ?? "Unknown error");
+        this.appendChatError(event.content ?? "Unknown error");
+        this.appendWorkspaceError(event.content ?? "Unknown error");
         break;
     }
   }
 
-  // ── Conversation rendering ─────────────────────────────────────────────────
+  // ── Chat pane rendering (LEFT) ────────────────────────────────────────────
 
-  /** Add a user message bubble. */
   private appendUserMsg(text: string): void {
+    if (!this.chatEl) return;
     const div = document.createElement("div");
-    div.className = "agent-msg agent-msg-user";
-    div.textContent = text;
-    this.conversationEl?.appendChild(div);
-    this.scrollToBottom();
+    div.className = "agent-chat-msg agent-chat-msg-user";
+    div.innerHTML = `<span class="chat-role chat-role-user">${USER_GLYPH} User</span>`;
+    const body = document.createElement("div");
+    body.className = "chat-body";
+    body.textContent = text;
+    div.appendChild(body);
+    this.chatEl.appendChild(div);
+    this.scrollChat();
   }
 
-  // Active streaming bubble element
+  private appendAgentMsg(text: string): void {
+    if (!this.chatEl) return;
+    const div = document.createElement("div");
+    div.className = "agent-chat-msg agent-chat-msg-agent";
+    div.innerHTML = `<span class="chat-role chat-role-agent">${AGENT_GLYPH} Agent</span>`;
+    const body = document.createElement("div");
+    body.className = "chat-body";
+    body.textContent = text;
+    div.appendChild(body);
+    this.chatEl.appendChild(div);
+    this.scrollChat();
+  }
+
+  // Streaming text
   private streamBubble: HTMLDivElement | null = null;
+  private streamBody: HTMLDivElement | null = null;
   private streamAccum = "";
 
-  /** Append a chunk of streamed assistant text. */
   private appendStreamText(chunk: string): void {
-    if (!this.conversationEl) return;
+    if (!this.chatEl) return;
 
     if (!this.streamBubble) {
       const div = document.createElement("div");
-      div.className = "agent-msg agent-msg-assistant";
-      this.conversationEl.appendChild(div);
+      div.className = "agent-chat-msg agent-chat-msg-agent";
+      div.innerHTML = `<span class="chat-role chat-role-agent">${AGENT_GLYPH} Agent</span>`;
+      const body = document.createElement("div");
+      body.className = "chat-body";
+      div.appendChild(body);
+      this.chatEl.appendChild(div);
       this.streamBubble = div;
+      this.streamBody = body;
       this.streamAccum = "";
     }
 
     this.streamAccum += chunk;
-    this.streamBubble.textContent = this.streamAccum;
-    this.scrollToBottom();
+    if (this.streamBody) this.streamBody.textContent = this.streamAccum;
+    this.scrollChat();
   }
 
-  /** Called on "done" — clears the active streaming bubble reference. */
   private sealStreamBubble(): void {
     this.streamBubble = null;
+    this.streamBody = null;
     this.streamAccum = "";
   }
 
-  /** Render a tool request block. Returns the element so results can update it. */
-  private appendToolBlock(name: string, argsJson: string): HTMLDivElement {
+  private appendChatError(message: string): void {
+    if (!this.chatEl) return;
+    const div = document.createElement("div");
+    div.className = "agent-chat-msg agent-chat-msg-error";
+    div.textContent = `⚠ ${message}`;
+    this.chatEl.appendChild(div);
+    this.scrollChat();
+  }
+
+  private scrollChat(): void {
+    if (this.chatEl) this.chatEl.scrollTop = this.chatEl.scrollHeight;
+  }
+
+  // ── Workspace pane rendering (RIGHT) ──────────────────────────────────────
+
+  private appendWorkspaceTool(name: string, argsJson: string): HTMLDivElement {
+    if (!this.workspaceEl) return document.createElement("div");
+
     const block = document.createElement("div");
-    block.className = "agent-tool-block";
+    block.className = "agent-ws-tool";
 
     const nameEl = document.createElement("div");
-    nameEl.className = "tool-name";
+    nameEl.className = "ws-tool-name";
     nameEl.textContent = `⚙ ${name}`;
     block.appendChild(nameEl);
 
     let argsFormatted = argsJson;
     try {
       argsFormatted = JSON.stringify(JSON.parse(argsJson), null, 2);
-    } catch {
-      // Raw string fallback
-    }
+    } catch {}
 
     const argsEl = document.createElement("pre");
-    argsEl.className = "tool-args";
+    argsEl.className = "ws-tool-args";
     argsEl.textContent = argsFormatted;
     block.appendChild(argsEl);
 
     const controls = document.createElement("div");
-    controls.className = "tool-controls";
+    controls.className = "ws-tool-controls";
     controls.textContent = "[Enter] approve   [Esc] reject";
     block.appendChild(controls);
 
-    this.conversationEl?.appendChild(block);
-    this.scrollToBottom();
+    this.workspaceEl.appendChild(block);
+    this.scrollWorkspace();
     return block;
   }
 
-  /** Update tool block controls to reflect approval. */
   private markToolApproved(): void {
     if (!this.pendingToolEl) return;
-    const controls = this.pendingToolEl.querySelector(".tool-controls");
+    const controls = this.pendingToolEl.querySelector(".ws-tool-controls");
     if (controls) controls.textContent = "✔ approved — executing…";
   }
 
-  /** Update tool block controls to reflect rejection. */
   private markToolRejected(): void {
     if (!this.pendingToolEl) return;
-    const controls = this.pendingToolEl.querySelector(".tool-controls");
+    const controls = this.pendingToolEl.querySelector(".ws-tool-controls");
     if (controls) controls.textContent = "✘ rejected";
   }
 
-  /** Append tool result inside the tool block. */
-  private appendToolResult(block: HTMLDivElement, result: string): void {
-    const controls = block.querySelector(".tool-controls");
+  private appendWorkspaceResult(block: HTMLDivElement, result: string): void {
+    const controls = block.querySelector(".ws-tool-controls");
     if (controls) controls.textContent = "✔ done";
 
     const resultEl = document.createElement("pre");
-    resultEl.className = "tool-result";
+    resultEl.className = "ws-tool-result";
     resultEl.textContent = result;
     block.appendChild(resultEl);
-    this.scrollToBottom();
+    this.scrollWorkspace();
   }
 
-  /** Append a red error message. */
-  private appendError(message: string): void {
-    if (!this.conversationEl) return;
+  private appendWorkspaceError(message: string): void {
+    if (!this.workspaceEl) return;
     const div = document.createElement("div");
-    div.className = "agent-msg";
-    div.style.color = "var(--koji-error)";
+    div.className = "ws-error";
     div.textContent = `⚠ ${message}`;
-    this.conversationEl.appendChild(div);
-    this.scrollToBottom();
+    this.workspaceEl.appendChild(div);
+    this.scrollWorkspace();
   }
 
-  /** Scroll the conversation area to the very bottom. */
-  private scrollToBottom(): void {
-    if (this.conversationEl) {
-      this.conversationEl.scrollTop = this.conversationEl.scrollHeight;
-    }
+  private scrollWorkspace(): void {
+    if (this.workspaceEl) this.workspaceEl.scrollTop = this.workspaceEl.scrollHeight;
   }
 
   // ── Input handling ────────────────────────────────────────────────────────
 
-  private submitInput(): void {
+  private async submitInput(): Promise<void> {
     if (!this.inputEl || !this.session) return;
     const text = this.inputEl.value.trim();
     if (!text) return;
 
     this.inputEl.value = "";
+
+    // $ prefix = run shell command directly
+    if (text.startsWith("$ ")) {
+      const cmd = text.slice(2);
+      this.appendUserMsg(text);
+      try {
+        const result = await invoke<string>("agent_run_command", { command: cmd });
+        this.appendAgentMsg(result || "(no output)");
+        // Also show in workspace
+        this.appendWorkspaceCmd(cmd, result);
+      } catch (e) {
+        this.appendChatError(`Command failed: ${e}`);
+      }
+      return;
+    }
+
+    // Regular message to agent
     this.appendUserMsg(text);
-    this.sealStreamBubble(); // start fresh bubble for assistant reply
+    this.sealStreamBubble();
 
     this.session.sendMessage(text).catch((err) => {
-      this.appendError(String(err));
+      this.appendChatError(String(err));
     });
+  }
+
+  /** Show a direct shell command in the workspace log */
+  private appendWorkspaceCmd(cmd: string, output: string): void {
+    if (!this.workspaceEl) return;
+    const block = document.createElement("div");
+    block.className = "agent-ws-tool";
+
+    const cmdEl = document.createElement("div");
+    cmdEl.className = "ws-tool-name";
+    cmdEl.textContent = `$ ${cmd}`;
+    block.appendChild(cmdEl);
+
+    if (output) {
+      const outEl = document.createElement("pre");
+      outEl.className = "ws-tool-result";
+      outEl.textContent = output;
+      block.appendChild(outEl);
+    }
+
+    this.workspaceEl.appendChild(block);
+    this.scrollWorkspace();
   }
 }
 

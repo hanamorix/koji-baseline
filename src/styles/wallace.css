@@ -345,63 +345,94 @@ html, body {
   font-size: 11px;
 }
 
-/* ── Agent pane ──────────────────────────────────────────────────────── */
-.agent-divider { width: 1px; background: var(--koji-dim); flex-shrink: 0; }
+/* ── Agent layout ────────────────────────────────────────────────────── */
 
-.agent-pane {
-  width: 40%;
+.agent-wrapper {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
   background: var(--koji-void);
   font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 13px;
-  color: var(--koji-warm);
+}
+
+.agent-divider { width: 1px; background: var(--koji-dim); flex-shrink: 0; }
+
+/* ── LEFT: Chat pane ─────────────────────────────────────────────────── */
+
+.agent-chat-pane {
+  flex: 6;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
   overflow: hidden;
 }
 
-.agent-header {
-  padding: 8px 12px;
+.agent-chat-header {
+  padding: 8px 14px;
   border-bottom: 1px solid var(--koji-deep);
-  color: var(--koji-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 11px;
+  color: var(--koji-muted);
 }
 
-.agent-conversation {
+.agent-chat-title { color: var(--koji-bright); font-weight: bold; }
+.agent-chat-model { color: var(--koji-faded); }
+
+.agent-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 12px;
+  padding: 12px 14px;
 }
 
-.agent-msg { margin-bottom: 8px; }
-.agent-msg-user { color: var(--koji-bright); }
-.agent-msg-user::before { content: "you › "; color: var(--koji-orange); }
-.agent-msg-assistant { color: var(--koji-warm); }
+.agent-chat-msg {
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
 
-.agent-tool-block {
-  background: rgba(10, 10, 10, 0.6);
-  border: 1px solid var(--koji-dim);
-  border-radius: 3px;
-  padding: 6px 8px;
-  margin: 6px 0;
+.chat-role {
+  display: block;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 2px;
+  letter-spacing: 0.05em;
+}
+
+.chat-role-user { color: var(--koji-bright); }
+.chat-role-agent { color: var(--koji-orange); }
+
+.chat-body {
+  color: var(--koji-warm);
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-chat-msg-user .chat-body { color: var(--koji-bright); }
+.agent-chat-msg-agent .chat-body { color: var(--koji-warm); }
+
+.agent-chat-msg-error {
+  color: var(--koji-error);
   font-size: 12px;
 }
 
-.agent-tool-block .tool-name { color: var(--koji-orange); font-weight: bold; }
-.agent-tool-block .tool-args { color: var(--koji-muted); white-space: pre-wrap; }
-.agent-tool-block .tool-controls { color: var(--koji-faded); font-size: 10px; margin-top: 4px; }
-.agent-tool-block .tool-result { color: var(--koji-muted); white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
-
-.agent-input-area {
-  padding: 8px 12px;
+.agent-chat-input-area {
+  padding: 10px 14px;
   border-top: 1px solid var(--koji-deep);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.agent-input-area .prompt-label { color: var(--koji-orange); white-space: nowrap; }
+.agent-chat-prompt {
+  color: var(--koji-bright);
+  font-size: 14px;
+  flex-shrink: 0;
+}
 
-.agent-input {
+.agent-chat-input {
   flex: 1;
   background: transparent;
   border: none;
@@ -411,3 +442,56 @@ html, body {
   font-size: 13px;
   caret-color: var(--koji-bright);
 }
+
+.agent-chat-input::placeholder { color: var(--koji-faded); }
+
+/* ── RIGHT: Workspace pane ───────────────────────────────────────────── */
+
+.agent-workspace-pane {
+  flex: 4;
+  display: flex;
+  flex-direction: column;
+  min-width: 250px;
+  overflow: hidden;
+  border-left: 1px solid var(--koji-deep);
+}
+
+.agent-ws-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--koji-deep);
+  font-size: 11px;
+  color: var(--koji-muted);
+  letter-spacing: 0.05em;
+}
+
+.agent-ws-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.agent-ws-tool {
+  background: rgba(10, 10, 10, 0.4);
+  border: 1px solid var(--koji-deep);
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+
+.ws-tool-name { color: var(--koji-orange); font-weight: bold; font-size: 11px; }
+.ws-tool-args { color: var(--koji-muted); font-size: 11px; white-space: pre-wrap; margin: 4px 0; }
+.ws-tool-controls { color: var(--koji-faded); font-size: 10px; margin-top: 4px; }
+.ws-tool-result {
+  color: var(--koji-warm);
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 4px;
+  padding: 4px;
+  background: rgba(10, 10, 10, 0.3);
+  border-radius: 2px;
+}
+
+.ws-error { color: var(--koji-error); font-size: 11px; margin-bottom: 8px; }

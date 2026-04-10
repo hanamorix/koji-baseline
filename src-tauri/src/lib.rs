@@ -338,6 +338,257 @@ fn load_config(key: String) -> String {
         .to_string()
 }
 
+// ─── Agent Tool Commands ──────────────────────────────────────────────────────
+
+/// Run a shell command via `/bin/sh -c "..."`. Captures stdout + stderr.
+/// Optional `cwd` overrides the working directory.
+#[tauri::command]
+async fn agent_run_command(command: String, cwd: Option<String>) -> Result<String, String> {
+    let mut cmd = std::process::Command::new("/bin/sh");
+    cmd.arg("-c").arg(&command);
+    if let Some(ref dir) = cwd {
+        let expanded = expand_tilde(dir);
+        cmd.current_dir(&expanded);
+    }
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to run command: {e}"))?;
+    let mut result = String::new();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stdout.is_empty() {
+        result.push_str(&stdout);
+    }
+    if !stderr.is_empty() {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str("[stderr]\n");
+        result.push_str(&stderr);
+    }
+    if result.is_empty() {
+        result.push_str("[no output]");
+    }
+    Ok(result)
+}
+
+/// Expand a leading `~/` to the user's home directory.
+fn expand_tilde(path: &str) -> std::path::PathBuf {
+    if path.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(&path[2..]);
+        }
+    }
+    std::path::PathBuf::from(path)
+}
+
+/// Read a file, optionally returning only lines [start_line, end_line] (1-indexed, inclusive).
+#[tauri::command]
+fn agent_read_file(
+    path: String,
+    start_line: Option<usize>,
+    end_line: Option<usize>,
+) -> Result<String, String> {
+    let expanded = expand_tilde(&path);
+    let content =
+        std::fs::read_to_string(&expanded).map_err(|e| format!("Read failed: {e}"))?;
+
+    match (start_line, end_line) {
+        (None, None) => Ok(content),
+        _ => {
+            let start = start_line.unwrap_or(1).saturating_sub(1); // convert to 0-indexed
+            let lines: Vec<&str> = content.lines().collect();
+            let end = end_line.unwrap_or(lines.len()).min(lines.len());
+            if start >= lines.len() {
+                return Ok(String::new());
+            }
+            Ok(lines[start..end].join("\n"))
+        }
+    }
+}
+
+/// Write content to a file, creating parent directories as needed.
+#[tauri::command]
+fn agent_write_file(path: String, content: String) -> Result<(), String> {
+    let expanded = expand_tilde(&path);
+    if let Some(parent) = expanded.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("mkdir failed: {e}"))?;
+    }
+    std::fs::write(&expanded, content).map_err(|e| format!("Write failed: {e}"))
+}
+
+/// Find and replace the first occurrence of `old_text` in a file.
+/// Returns an error if `old_text` is not found.
+#[tauri::command]
+fn agent_edit_file(path: String, old_text: String, new_text: String) -> Result<(), String> {
+    let expanded = expand_tilde(&path);
+    let content =
+        std::fs::read_to_string(&expanded).map_err(|e| format!("Read failed: {e}"))?;
+    if !content.contains(&old_text) {
+        return Err(format!(
+            "old_text not found in {path}: {:?}",
+            &old_text[..old_text.len().min(80)]
+        ));
+    }
+    let updated = content.replacen(&old_text, &new_text, 1);
+    std::fs::write(&expanded, updated).map_err(|e| format!("Write failed: {e}"))
+}
+
+/// List directory entries. If `recursive` is true, walks the tree.
+#[tauri::command]
+fn agent_list_directory(path: String, recursive: Option<bool>) -> Result<String, String> {
+    let expanded = expand_tilde(&path);
+    let recurse = recursive.unwrap_or(false);
+
+    if recurse {
+        // Use the shell for simplicity and to respect .gitignore naturally
+        let output = std::process::Command::new("/bin/sh")
+            .arg("-c")
+            .arg(format!(
+                "find {} -not -path '*/\\.*' | sort",
+                expanded.to_string_lossy()
+            ))
+            .output()
+            .map_err(|e| format!("find failed: {e}"))?;
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        let entries = std::fs::read_dir(&expanded).map_err(|e| format!("readdir failed: {e}"))?;
+        let mut lines: Vec<String> = entries
+            .filter_map(|e| {
+                let e = e.ok()?;
+                let name = e.file_name().to_string_lossy().to_string();
+                let suffix = if e.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    "/"
+                } else {
+                    ""
+                };
+                Some(format!("{name}{suffix}"))
+            })
+            .collect();
+        lines.sort();
+        Ok(lines.join("\n"))
+    }
+}
+
+/// Search file contents with ripgrep (or grep fallback). Returns matching lines.
+#[tauri::command]
+fn agent_search_files(
+    pattern: String,
+    path: Option<String>,
+    glob: Option<String>,
+) -> Result<String, String> {
+    let search_path = path
+        .as_deref()
+        .map(expand_tilde)
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    // Try ripgrep first, fall back to grep
+    let rg_available = std::process::Command::new("which")
+        .arg("rg")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    let output = if rg_available {
+        let mut args = vec![
+            "--color=never".to_string(),
+            "-n".to_string(),
+            pattern.clone(),
+            search_path.to_string_lossy().to_string(),
+        ];
+        if let Some(ref g) = glob {
+            args.insert(0, g.clone());
+            args.insert(0, "--glob".to_string());
+        }
+        std::process::Command::new("rg")
+            .args(&args)
+            .output()
+            .map_err(|e| format!("rg failed: {e}"))?
+    } else {
+        let mut cmd_str = format!(
+            "grep -rn {} {}",
+            shell_escape(&pattern),
+            search_path.to_string_lossy()
+        );
+        if let Some(ref g) = glob {
+            cmd_str = format!(
+                "grep -rn {} --include={} {}",
+                shell_escape(&pattern),
+                shell_escape(g),
+                search_path.to_string_lossy()
+            );
+        }
+        std::process::Command::new("/bin/sh")
+            .arg("-c")
+            .arg(&cmd_str)
+            .output()
+            .map_err(|e| format!("grep failed: {e}"))?
+    };
+
+    let result = String::from_utf8_lossy(&output.stdout).into_owned();
+    if result.is_empty() {
+        Ok("[no matches]".to_string())
+    } else {
+        Ok(result)
+    }
+}
+
+/// Minimal shell escaping — wraps in single quotes and escapes internal single quotes.
+fn shell_escape(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// Search for files by name pattern using `find`.
+#[tauri::command]
+fn agent_search_filenames(pattern: String, path: Option<String>) -> Result<String, String> {
+    let search_path = path
+        .as_deref()
+        .map(expand_tilde)
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    let output = std::process::Command::new("find")
+        .arg(&search_path)
+        .arg("-name")
+        .arg(&pattern)
+        .output()
+        .map_err(|e| format!("find failed: {e}"))?;
+
+    let result = String::from_utf8_lossy(&output.stdout).into_owned();
+    if result.is_empty() {
+        Ok("[no matches]".to_string())
+    } else {
+        Ok(result)
+    }
+}
+
+/// Fetch a URL via HTTP GET and return the response body as text.
+#[tauri::command]
+async fn agent_fetch_url(url: String) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("koji-baseline-agent/0.3")
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Client build failed: {e}"))?;
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Body read failed: {e}"))?;
+
+    if !status.is_success() {
+        Ok(format!("[HTTP {status}]\n{body}"))
+    } else {
+        Ok(body)
+    }
+}
+
 // ─── App bootstrap ────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -368,6 +619,14 @@ pub fn run() {
             open_file,
             openai_chat_stream,
             openai_list_models,
+            agent_run_command,
+            agent_read_file,
+            agent_write_file,
+            agent_edit_file,
+            agent_list_directory,
+            agent_search_files,
+            agent_search_filenames,
+            agent_fetch_url,
         ])
         .setup(|app| {
             monitor::start_monitor(app.handle().clone());

@@ -341,3 +341,24 @@ function keyToAnsi(event: KeyboardEvent): string | null {
       return null;
   }
 }
+
+// ─── Provider config helper ───────────────────────────────────────────────────
+
+/**
+ * Read active provider/model/autorun from ~/.koji-baseline/config.json.
+ * Exported so command handlers (e.g. /llm provider) can use it.
+ */
+export async function loadProviderConfig(): Promise<{
+  provider: string;
+  model: string;
+  autorun: string;
+}> {
+  const provider = await invoke<string>("load_config", { key: "activeProvider" }).catch(() => "");
+  const model    = await invoke<string>("load_config", { key: "activeModel" }).catch(() => "");
+  const autorun  = await invoke<string>("load_config", { key: "autorun" }).catch(() => "");
+  return {
+    provider: provider || "ollama",
+    model:    model    || "",
+    autorun:  autorun  || "off",
+  };
+}

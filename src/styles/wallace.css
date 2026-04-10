@@ -475,3 +475,74 @@ html, body {
 }
 
 .ws-error { color: var(--koji-error); font-size: 11px; margin-bottom: 8px; }
+
+/* ── DOM Terminal Grid ──────────────────────────────────────────────────────── */
+
+.terminal-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.grid-scroll {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+/* Themed scrollbar — fade on idle via JS class toggle */
+.grid-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.grid-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.grid-scroll::-webkit-scrollbar-thumb {
+  background: var(--koji-faded);
+  border-radius: 3px;
+  transition: opacity 0.3s ease;
+}
+
+.grid-scroll.scrollbar-hidden::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.grid-row {
+  white-space: pre;
+  line-height: 1.3;
+  height: 1.3em;
+}
+
+.cell {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+}
+
+.cell.wide {
+  width: 2ch;
+}
+
+.cell--cursor {
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { border-left: 2px solid var(--koji-bright); }
+  50% { border-left: 2px solid transparent; }
+}
+
+/* Selection highlight */
+.terminal-grid ::selection {
+  background: rgba(255, 140, 0, 0.25);
+}
+
+.terminal-grid ::-moz-selection {
+  background: rgba(255, 140, 0, 0.25);
+}

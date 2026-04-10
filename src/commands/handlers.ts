@@ -15,6 +15,7 @@ export async function handleHelp(): Promise<MenuResult> {
     { label: "/help",             value: "help",      description: "Show this command reference" },
     { label: "/theme",            value: "theme",     description: "Open interactive theme picker" },
     { label: "/font",             value: "font",      description: "Change terminal font" },
+    { label: "/cursor",           value: "cursor",    description: "Change cursor style" },
     { label: "/agent",            value: "agent",     description: "Open agent split-pane" },
     { label: "/exit",             value: "exit",      description: "Close agent split-pane" },
     { label: "/version",          value: "version",   description: "Print version" },
@@ -35,6 +36,7 @@ export async function handleHelp(): Promise<MenuResult> {
         switch (value) {
           case "theme":    return handleTheme([]);
           case "font":     return handleFont("");
+          case "cursor":   return handleCursor("");
           case "agent":    return handleAgent([]);
           case "exit":     return handleExit([]);
           case "version":  return handleVersion().then((o) => ({ output: o, isError: false }));
@@ -307,4 +309,43 @@ export function handleFont(args: string): Promise<DispatchResult> {
     output: `Unknown font. Available: ${FONT_OPTIONS.map((f) => f.name).join(", ")}`,
     isError: true,
   });
+}
+
+// ─── /cursor ──────────────────────────────────────────────────────────────────
+
+const CURSOR_STYLES = [
+  { name: "block",     description: "Solid rectangle — classic terminal" },
+  { name: "beam",      description: "Thin vertical line — modern/IDE feel" },
+  { name: "underline", description: "Horizontal line under character — minimal" },
+];
+
+export async function handleCursor(args: string): Promise<DispatchResult> {
+  if (!args) {
+    const currentStyle = await invoke<string>("load_config", { key: "cursor_style" }).catch(() => "block") || "block";
+    const result: MenuResult = {
+      type: "menu",
+      items: CURSOR_STYLES.map((s) => ({
+        label: s.name,
+        value: s.name,
+        description: s.description,
+        active: s.name === currentStyle,
+      })),
+      onSelect: async (value: string) => {
+        await invoke("save_config", { key: "cursor_style", value });
+        const { domGrid } = await import("../main");
+        domGrid.setCursorStyle(value as "block" | "beam" | "underline");
+      },
+    };
+    return result;
+  }
+
+  const style = args.toLowerCase();
+  if (["block", "beam", "underline"].includes(style)) {
+    await invoke("save_config", { key: "cursor_style", value: style });
+    const { domGrid } = await import("../main");
+    domGrid.setCursorStyle(style as "block" | "beam" | "underline");
+    return { output: `Cursor: ${style}`, isError: false };
+  }
+
+  return { output: "Usage: /cursor block|beam|underline", isError: true };
 }

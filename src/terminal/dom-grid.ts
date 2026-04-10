@@ -113,6 +113,7 @@ export class DOMGrid {
   private fontFamily = "'JetBrains Mono', 'Apple Color Emoji', 'Hiragino Sans', 'Noto Sans CJK SC', monospace";
   private fontSize = 14;
   private ligatures = true;
+  private cursorStyle: "block" | "beam" | "underline" = "block";
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -358,19 +359,28 @@ export class DOMGrid {
     }
   }
 
+  setCursorStyle(style: "block" | "beam" | "underline"): void {
+    this.cursorStyle = style;
+    if (this.lastSnapshot) this.updateCursor(this.lastSnapshot.cursor);
+  }
+
   private updateCursor(cursor: CursorPos): void {
-    // Remove old cursor
+    const cursorClass = `cell--cursor-${this.cursorStyle}`;
+
+    // Remove old cursor (all variants)
     if (this.cursorRow >= 0 && this.cursorRow < this.viewportRows.length) {
       const oldRow = this.viewportRows[this.cursorRow].el;
       const oldCell = oldRow.children[this.cursorCol] as HTMLElement | undefined;
-      if (oldCell) oldCell.classList.remove("cell--cursor");
+      if (oldCell) {
+        oldCell.classList.remove("cell--cursor-block", "cell--cursor-beam", "cell--cursor-underline");
+      }
     }
 
     // Add new cursor
     if (cursor.row >= 0 && cursor.row < this.viewportRows.length) {
       const newRow = this.viewportRows[cursor.row].el;
       const newCell = newRow.children[cursor.col] as HTMLElement | undefined;
-      if (newCell) newCell.classList.add("cell--cursor");
+      if (newCell) newCell.classList.add(cursorClass);
     }
 
     this.cursorRow = cursor.row;

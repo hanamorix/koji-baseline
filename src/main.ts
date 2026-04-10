@@ -75,6 +75,11 @@ const selection = new SelectionManager(domGrid.getGridElement());
 invoke("load_config", { key: "copy_on_select" }).then((val: unknown) => {
   if (val === "false") selection.setCopyOnSelect(false);
 }).catch(() => {});
+invoke("load_config", { key: "cursor_style" }).then((val: unknown) => {
+  if (val === "beam" || val === "underline") {
+    domGrid.setCursorStyle(val as "beam" | "underline");
+  }
+}).catch(() => {});
 const effects = new TransitionEffects(domGrid.getGridElement());
 const autocomplete = new Autocomplete(domGrid.getGridElement(), domGrid);
 const search = new TerminalSearch(domGrid.getGridElement(), domGrid);

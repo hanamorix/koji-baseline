@@ -631,13 +631,37 @@ html, body {
   width: 2ch;
 }
 
-.cell--cursor {
-  animation: cursor-blink 1s step-end infinite;
+/* ── Cursor styles ───────────────────────────────────────────────────────── */
+
+.cell--cursor-block {
+  background: var(--koji-bright) !important;
+  color: var(--koji-void) !important;
+  animation: cursor-blink-block 1s step-end infinite;
 }
 
-@keyframes cursor-blink {
-  0%, 100% { border-left: 3px solid var(--koji-bright); }
-  50% { border-left: 3px solid transparent; }
+.cell--cursor-beam {
+  border-left: 3px solid var(--koji-bright);
+  animation: cursor-blink-beam 1s step-end infinite;
+}
+
+.cell--cursor-underline {
+  border-bottom: 2px solid var(--koji-bright);
+  animation: cursor-blink-underline 1s step-end infinite;
+}
+
+@keyframes cursor-blink-block {
+  0%, 100% { background: var(--koji-bright); color: var(--koji-void); }
+  50% { background: transparent; color: inherit; }
+}
+
+@keyframes cursor-blink-beam {
+  0%, 100% { border-left-color: var(--koji-bright); }
+  50% { border-left-color: transparent; }
+}
+
+@keyframes cursor-blink-underline {
+  0%, 100% { border-bottom-color: var(--koji-bright); }
+  50% { border-bottom-color: transparent; }
 }
 
 .cell-blink {

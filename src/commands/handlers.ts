@@ -113,18 +113,12 @@ export async function handleTheme(args: string[]): Promise<{ output: string; isE
 export async function handleLlm(args: string[]): Promise<{ output: string; isError: boolean } | MenuResult> {
   const sub = args[0]?.toLowerCase() ?? "";
 
-  // connect / no-arg: status check
-  if (sub === "" || sub === "connect") {
-    try {
-      const status = await invoke<{ model: string; state: string }>("check_ollama");
-      const icon = status.state === "ready" ? "●" : "○";
-      return {
-        output: `${icon} Ollama ${status.state}  model: ${status.model}`,
-        isError: status.state !== "ready",
-      };
-    } catch {
-      return { output: "○ Ollama offline — is it running?", isError: true };
-    }
+  // no-arg: hint about the guided onboarding flow
+  if (sub === "") {
+    return {
+      output: "Click the >> badge in the top bar to set up or check the LLM connection.",
+      isError: false,
+    };
   }
 
   // models: open interactive picker
@@ -222,30 +216,7 @@ export async function handleLlm(args: string[]): Promise<{ output: string; isErr
     return { output: lines.join("\n"), isError: false };
   }
 
-  // provider / provider <name>: placeholder for Task 5
-  if (sub === "provider") {
-    const providerName = args[1]?.toLowerCase() ?? "";
-    if (!providerName) {
-      // List providers — Task 5 will populate this from actual config
-      return {
-        output: [
-          "Configured providers:",
-          "  ● ollama  (active)  — http://localhost:11434",
-          "",
-          "  Use /llm provider <name> to switch.",
-          "  Additional providers available after Task 5.",
-        ].join("\n"),
-        isError: false,
-      };
-    }
-    // Switch provider — placeholder until Task 5 wires the real abstraction
-    return {
-      output: `Provider switching to "${providerName}" — available in Task 5.`,
-      isError: false,
-    };
-  }
-
-  return { output: `Unknown /llm subcommand "${sub}". Try: connect, models, model <name>, pull <name>, autorun, recommend, provider`, isError: true };
+  return { output: `Unknown /llm subcommand "${sub}". Try: models, model <name>, pull <name>, autorun, recommend`, isError: true };
 }
 
 // ─── /agent ───────────────────────────────────────────────────────────────────

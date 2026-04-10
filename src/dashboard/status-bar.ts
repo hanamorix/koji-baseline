@@ -1,13 +1,9 @@
 // status-bar.ts — Wallace dashboard initialiser
 // Wires: era clock, system-stats events → CPU/MEM display elements.
-// Also exports the last-seen CPU percent so waveform.ts can read it.
-// Task 13: listens for "cwd-changed" → updates path, git branch, git status.
+// Listens for "cwd-changed" → updates path, git branch, git status.
 
 import { listen } from "@tauri-apps/api/event";
 import { startClock } from "./clock";
-
-// Shared so waveform animator can poll without its own listener
-export let lastCpuPercent = 0;
 
 interface SystemStats {
   cpu_percent: f32;
@@ -39,8 +35,6 @@ export function initDashboard(): void {
 
   listen<SystemStats>("system-stats", (event) => {
     const { cpu_percent, mem_used_gb } = event.payload;
-
-    lastCpuPercent = cpu_percent;
 
     if (cpuEl)  cpuEl.textContent  = `${Math.round(cpu_percent)}%`;
     if (memEl)  memEl.textContent  = `${mem_used_gb.toFixed(1)}G`;

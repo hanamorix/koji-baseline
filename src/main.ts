@@ -22,6 +22,7 @@ import { overlay } from "./overlay/overlay";
 import { openMenu } from "./overlay/menu";
 import type { MenuResult } from "./overlay/menu";
 import { agentPane } from "./agent/pane";
+import { llmOnboarding } from "./llm/onboarding";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,11 @@ invoke<{ model: string; state: string }>("check_ollama")
     const dotEl = document.getElementById("llm-dot");
     if (dotEl) dotEl.style.background = "#3a2a10";
   });
+
+// Expose onboarding handler for the >> badge onclick in index.html
+(window as unknown as Record<string, unknown>)["__kojiLlmOnboard"] = () => {
+  llmOnboarding.run().catch(console.error);
+};
 
 // ─── CWD tracking — updated by the same "cwd-changed" event the status bar uses
 
@@ -272,6 +278,23 @@ window.addEventListener("keydown", async (event) => {
         event.preventDefault();
         effects?.commandSubmit();
         overlay.dismiss(); // clear any previous overlay
+
+        // Auto-trigger onboarding if no model is configured yet
+        const activeModel = await invoke<string>("load_config", { key: "activeModel" }).catch(() => "");
+        let ollamaReady = false;
+        try {
+          const s = await invoke<{ model: string; state: string }>("check_ollama");
+          ollamaReady = s.state === "ready" && !!s.model;
+        } catch {
+          ollamaReady = false;
+        }
+
+        if (!ollamaReady && !activeModel) {
+          llmOnboarding.run().catch(console.error);
+          currentInput = "";
+          return;
+        }
+
         llm.query(line).catch((err) => console.error("llm.query failed:", err));
         currentInput = "";
         return;

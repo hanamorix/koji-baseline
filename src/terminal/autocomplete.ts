@@ -1,6 +1,5 @@
 // autocomplete.ts — Floating ghost text + suggestion dropdown
-// Ghost text floats over the grid at the cursor position (survives re-renders).
-// Dropdown shows file/directory completions and history matches.
+// Ghost text floats at the cursor. Dropdown shows files, dirs, history, commands.
 
 import { invoke } from "@tauri-apps/api/core";
 import type { DOMGrid } from "./dom-grid";
@@ -11,7 +10,6 @@ const SLASH_COMMANDS = [
   "/llm autorun full", "/agent", "/exit",
 ];
 
-// Commands that take path arguments
 const PATH_COMMANDS = new Set([
   "cd", "ls", "cat", "less", "more", "head", "tail", "vim", "nvim",
   "nano", "code", "open", "rm", "cp", "mv", "mkdir", "touch",
@@ -20,6 +18,7 @@ const PATH_COMMANDS = new Set([
 
 interface Suggestion {
   text: string;
+  display: string;
   kind: "history" | "command" | "file" | "directory";
 }
 
@@ -29,81 +28,74 @@ export class Autocomplete {
   private dropdownEl: HTMLDivElement;
   private currentSuggestion = "";
   private suggestions: Suggestion[] = [];
-  private selectedIndex = -1;
+  private selectedIndex = 0;
   private shellHistory: string[] = [];
   private visible = false;
   private dropdownVisible = false;
-  private pendingPathQuery: ReturnType<typeof setTimeout> | null = null;
+  private lastInput = "";
+  private pathQueryId = 0; // Increment to invalidate stale async results
 
   constructor(container: HTMLElement, grid: DOMGrid) {
     this.grid = grid;
 
-    // Floating ghost text — positioned absolutely over the grid
     this.ghostEl = document.createElement("div");
     this.ghostEl.className = "ghost-float";
     container.appendChild(this.ghostEl);
 
-    // Suggestion dropdown
     this.dropdownEl = document.createElement("div");
     this.dropdownEl.className = "suggest-dropdown";
     container.appendChild(this.dropdownEl);
   }
 
   addToHistory(cmd: string): void {
+    if (!cmd.trim()) return;
     const idx = this.shellHistory.indexOf(cmd);
     if (idx >= 0) this.shellHistory.splice(idx, 1);
     this.shellHistory.push(cmd);
     if (this.shellHistory.length > 100) this.shellHistory.shift();
   }
 
-  /** Update suggestions based on current input. Call after every keystroke. */
+  /** Call on every keystroke. Builds suggestions and shows ghost/dropdown. */
   update(input: string): void {
+    this.lastInput = input;
+
     if (!input) {
       this.hide();
       return;
     }
 
-    // Build suggestion list
+    // Build synchronous suggestions first
     this.suggestions = [];
-    this.selectedIndex = -1;
+    this.selectedIndex = 0;
 
     if (input.startsWith("/")) {
-      // Slash command suggestions
       const lower = input.toLowerCase();
       for (const cmd of SLASH_COMMANDS) {
         if (cmd.toLowerCase().startsWith(lower) && cmd.toLowerCase() !== lower) {
-          this.suggestions.push({ text: cmd, kind: "command" });
+          this.suggestions.push({ text: cmd, display: cmd, kind: "command" });
         }
       }
-    } else {
-      // Shell history suggestions (most recent first)
-      for (let i = this.shellHistory.length - 1; i >= 0; i--) {
-        if (this.shellHistory[i].startsWith(input) && this.shellHistory[i] !== input) {
-          this.suggestions.push({ text: this.shellHistory[i], kind: "history" });
-          if (this.suggestions.length >= 5) break;
+    }
+
+    // Shell history (all inputs, not just path commands)
+    for (let i = this.shellHistory.length - 1; i >= 0; i--) {
+      const h = this.shellHistory[i];
+      if (h.startsWith(input) && h !== input) {
+        // Avoid duplicates with slash command suggestions
+        if (!this.suggestions.some((s) => s.text === h)) {
+          this.suggestions.push({ text: h, display: h, kind: "history" });
         }
+        if (this.suggestions.length >= 8) break;
       }
-
-      // Path completion — check if we're typing a path argument
-      this.checkPathCompletion(input);
     }
 
-    if (this.suggestions.length > 0) {
-      this.currentSuggestion = this.suggestions[0].text;
-      this.showGhost(this.suggestions[0].text.slice(input.length));
-      if (this.suggestions.length > 1) {
-        this.showDropdown(input);
-      } else {
-        this.hideDropdown();
-      }
-    } else {
-      this.currentSuggestion = "";
-      this.hideGhost();
-      this.hideDropdown();
-    }
+    this.applyDisplay();
+
+    // Async: check for path completions
+    this.maybePathComplete(input);
   }
 
-  /** Navigate dropdown: -1 for up, +1 for down. Returns true if handled. */
+  /** Navigate dropdown. Returns true if handled. */
   navigate(delta: number): boolean {
     if (!this.dropdownVisible || this.suggestions.length === 0) return false;
 
@@ -112,6 +104,11 @@ export class Autocomplete {
     if (this.selectedIndex >= this.suggestions.length) this.selectedIndex = 0;
 
     this.currentSuggestion = this.suggestions[this.selectedIndex].text;
+
+    // Update ghost to show selected item's completion
+    const completion = this.currentSuggestion.slice(this.lastInput.length);
+    this.positionGhost(completion);
+
     this.renderDropdown();
     return true;
   }
@@ -128,11 +125,8 @@ export class Autocomplete {
     this.hideDropdown();
     this.currentSuggestion = "";
     this.suggestions = [];
-    this.selectedIndex = -1;
-    if (this.pendingPathQuery) {
-      clearTimeout(this.pendingPathQuery);
-      this.pendingPathQuery = null;
-    }
+    this.selectedIndex = 0;
+    this.pathQueryId++;
   }
 
   getSuggestion(): string {
@@ -143,9 +137,31 @@ export class Autocomplete {
     return this.dropdownVisible;
   }
 
-  // ── Ghost text (floating overlay at cursor) ───────────────────────────
+  // ── Display ───────────────────────────────────────────────────────────
 
-  private showGhost(completion: string): void {
+  private applyDisplay(): void {
+    if (this.suggestions.length > 0) {
+      this.currentSuggestion = this.suggestions[0].text;
+      const completion = this.currentSuggestion.slice(this.lastInput.length);
+      this.positionGhost(completion);
+
+      if (this.suggestions.length > 1) {
+        this.showDropdown();
+      } else {
+        this.hideDropdown();
+      }
+    } else {
+      this.currentSuggestion = "";
+      this.hideGhost();
+      this.hideDropdown();
+    }
+  }
+
+  // ── Ghost text ────────────────────────────────────────────────────────
+
+  private positionGhost(completion: string): void {
+    if (!completion) { this.hideGhost(); return; }
+
     const pos = this.getCursorPixelPos();
     if (!pos) { this.hideGhost(); return; }
 
@@ -163,14 +179,13 @@ export class Autocomplete {
     }
   }
 
-  // ── Suggestion dropdown ───────────────────────────────────────────────
+  // ── Dropdown ──────────────────────────────────────────────────────────
 
-  private showDropdown(_input: string): void {
+  private showDropdown(): void {
     const pos = this.getCursorPixelPos();
     if (!pos) { this.hideDropdown(); return; }
 
     this.dropdownEl.style.left = `${pos.x}px`;
-    // Position below the cursor line
     this.dropdownEl.style.top = `${pos.y + pos.lineHeight}px`;
     this.renderDropdown();
     this.dropdownEl.style.display = "block";
@@ -186,19 +201,20 @@ export class Autocomplete {
 
   private renderDropdown(): void {
     this.dropdownEl.innerHTML = "";
-    for (let i = 0; i < this.suggestions.length && i < 8; i++) {
+    const limit = Math.min(this.suggestions.length, 8);
+    for (let i = 0; i < limit; i++) {
       const s = this.suggestions[i];
       const row = document.createElement("div");
       row.className = "suggest-item" + (i === this.selectedIndex ? " selected" : "");
 
       const icon = document.createElement("span");
       icon.className = "suggest-icon";
-      icon.textContent = s.kind === "directory" ? "📁" : s.kind === "file" ? "📄" : s.kind === "command" ? "/" : "↩";
+      icon.textContent = s.kind === "directory" ? "📁" : s.kind === "file" ? "📄" : s.kind === "command" ? "⌘" : "↩";
       row.appendChild(icon);
 
       const label = document.createElement("span");
       label.className = "suggest-label";
-      label.textContent = s.text;
+      label.textContent = s.display;
       row.appendChild(label);
 
       const kind = document.createElement("span");
@@ -208,6 +224,7 @@ export class Autocomplete {
 
       row.addEventListener("mousedown", (e) => {
         e.preventDefault();
+        this.selectedIndex = i;
         this.currentSuggestion = s.text;
       });
 
@@ -217,29 +234,31 @@ export class Autocomplete {
 
   // ── Path completion ───────────────────────────────────────────────────
 
-  private checkPathCompletion(input: string): void {
-    // Extract the current word (after the last space)
+  private maybePathComplete(input: string): void {
     const parts = input.split(/\s+/);
-    const currentWord = parts[parts.length - 1] || "";
-    const command = parts[0] || "";
+    if (parts.length < 2) return; // Need at least "command arg"
 
-    // Only complete paths for known path commands, or if word looks like a path
+    const command = parts[0];
+    const currentWord = parts[parts.length - 1] || "";
+
     const isPathCmd = PATH_COMMANDS.has(command);
     const looksLikePath = currentWord.startsWith("/") || currentWord.startsWith("./") ||
-                          currentWord.startsWith("../") || currentWord.startsWith("~");
+                          currentWord.startsWith("../") || currentWord.startsWith("~") ||
+                          currentWord.includes("/");
 
     if (!isPathCmd && !looksLikePath) return;
-    if (!currentWord) return;
 
-    // Debounce path queries to avoid hammering the filesystem
-    if (this.pendingPathQuery) clearTimeout(this.pendingPathQuery);
-    this.pendingPathQuery = setTimeout(() => {
-      this.fetchPathSuggestions(input, currentWord).catch(() => {});
-    }, 100);
+    // Increment query ID to invalidate any in-flight requests
+    const queryId = ++this.pathQueryId;
+
+    // Small delay to avoid hammering FS on fast typing
+    setTimeout(() => {
+      if (this.pathQueryId !== queryId) return; // Stale
+      this.fetchPaths(input, currentWord, queryId).catch(() => {});
+    }, 80);
   }
 
-  private async fetchPathSuggestions(fullInput: string, pathFragment: string): Promise<void> {
-    // Split into directory and partial name
+  private async fetchPaths(fullInput: string, pathFragment: string, queryId: number): Promise<void> {
     const lastSlash = pathFragment.lastIndexOf("/");
     let dir: string;
     let partial: string;
@@ -252,7 +271,7 @@ export class Autocomplete {
       partial = pathFragment.toLowerCase();
     }
 
-    // Expand ~ — use agent_run_command to resolve
+    // Expand ~
     if (dir.startsWith("~")) {
       try {
         const home = await invoke<string>("agent_run_command", { command: "echo $HOME" });
@@ -260,43 +279,37 @@ export class Autocomplete {
       } catch { return; }
     }
 
+    if (this.pathQueryId !== queryId) return; // Stale
+
     try {
       const entries = await invoke<string>("agent_list_directory", { path: dir, recursive: false });
-      const lines = entries.split("\n").filter((l) => l.trim());
+      if (this.pathQueryId !== queryId) return; // Stale
 
-      // Filter by partial match
-      const matches = lines
-        .filter((name) => name.toLowerCase().startsWith(partial) && name.toLowerCase() !== partial)
-        .slice(0, 8);
+      const lines = entries.split("\n").filter((l) => l.trim());
+      const matches = lines.filter((name) => {
+        const bare = name.replace(/\/$/, "");
+        return bare.toLowerCase().startsWith(partial) && bare.toLowerCase() !== partial;
+      }).slice(0, 8);
 
       if (matches.length === 0) return;
 
-      // Build full suggestions
-      const prefix = fullInput.slice(0, fullInput.length - (partial.length || 0));
-      const pathSuggestions: Suggestion[] = [];
+      // Build full text for each suggestion
+      const inputPrefix = fullInput.slice(0, fullInput.length - pathFragment.length);
+      const pathPrefix = lastSlash >= 0 ? pathFragment.slice(0, lastSlash + 1) : "";
 
-      for (const name of matches) {
-        const isDir = name.endsWith("/");
-        pathSuggestions.push({
-          text: prefix + name,
-          kind: isDir ? "directory" : "file",
-        });
-      }
+      const pathSuggestions: Suggestion[] = matches.map((name) => ({
+        text: inputPrefix + pathPrefix + name,
+        display: name,
+        kind: (name.endsWith("/") ? "directory" : "file") as "directory" | "file",
+      }));
 
-      // Merge path suggestions with existing ones (path suggestions first)
+      // Merge: path suggestions first, then existing non-path ones
       const existing = this.suggestions.filter((s) => s.kind !== "file" && s.kind !== "directory");
       this.suggestions = [...pathSuggestions, ...existing];
-
-      // Update display
-      if (this.suggestions.length > 0) {
-        this.currentSuggestion = this.suggestions[0].text;
-        this.showGhost(this.suggestions[0].text.slice(fullInput.length));
-        if (this.suggestions.length > 1) {
-          this.showDropdown(fullInput);
-        }
-      }
+      this.selectedIndex = 0;
+      this.applyDisplay();
     } catch {
-      // Directory listing failed — no path suggestions
+      // Failed — no path suggestions
     }
   }
 

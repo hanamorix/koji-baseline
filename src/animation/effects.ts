@@ -1,93 +1,43 @@
-// effects.ts — TransitionEffects: command submit sweep, completion pulse, error flicker
+// effects.ts — CSS-based command transition effects (no Canvas, no RAF)
 
 export class TransitionEffects {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  private gridEl: HTMLElement;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    this.ctx    = canvas.getContext("2d")!;
+  constructor(gridEl: HTMLElement) {
+    this.gridEl = gridEl;
   }
 
-  // ── commandSubmit ────────────────────────────────────────────────────────────
-  // Brief horizontal scan-line sweep across the full canvas height.
-  // Amber, 6% opacity, 4px stride.
-
-  /** Get logical canvas dimensions (context is already DPR-scaled) */
-  private logicalSize(): { width: number; height: number } {
-    const dpr = window.devicePixelRatio || 1;
-    return {
-      width:  this.canvas.width / dpr,
-      height: this.canvas.height / dpr,
-    };
-  }
-
+  /** Brief amber flash across the entire grid on command submit. */
   commandSubmit(): void {
-    const { ctx } = this;
-    const { width, height } = this.logicalSize();
+    this.gridEl.classList.remove("effect-flash");
+    // Force reflow to restart animation
+    void this.gridEl.offsetWidth;
+    this.gridEl.classList.add("effect-flash");
+    this.gridEl.addEventListener("animationend", () => {
+      this.gridEl.classList.remove("effect-flash");
+    }, { once: true });
+  }
 
-    ctx.fillStyle = "rgba(255,106,0,0.06)";
-    for (let y = 0; y < height; y += 4) {
-      ctx.fillRect(0, y, width, 2);
+  /** Amber pulse on rows that received command output. */
+  commandComplete(startRow: number, endRow: number): void {
+    this.applyRowEffect("effect-complete", startRow, endRow);
+  }
+
+  /** Red flicker on error rows. */
+  errorFlicker(startRow: number, endRow: number): void {
+    this.applyRowEffect("effect-error", startRow, endRow);
+  }
+
+  private applyRowEffect(cls: string, startRow: number, endRow: number): void {
+    const rows = this.gridEl.querySelectorAll(".grid-row");
+    for (let i = startRow; i <= endRow && i < rows.length; i++) {
+      const row = rows[i] as HTMLElement;
+      row.classList.remove(cls);
+      void row.offsetWidth;
+      row.classList.add(cls);
+      row.addEventListener("animationend", () => {
+        row.classList.remove(cls);
+      }, { once: true });
     }
-
-    // Fade it out over ~200 ms
-    let alpha = 0.06;
-    const fade = () => {
-      alpha -= 0.006;
-      if (alpha <= 0) return;
-      ctx.fillStyle = `rgba(10,10,10,0.04)`;
-      ctx.fillRect(0, 0, width, height);
-      requestAnimationFrame(fade);
-    };
-    requestAnimationFrame(fade);
-  }
-
-  // ── commandComplete ──────────────────────────────────────────────────────────
-  // Subtle amber pulse over the rows that just received output.
-  // Fades from 8% → 0 opacity.
-
-  commandComplete(startRow: number, endRow: number, cellHeight: number): void {
-    const { ctx } = this;
-    const y      = startRow * cellHeight;
-    const height = (endRow - startRow + 1) * cellHeight;
-    const { width } = this.logicalSize();
-
-    let alpha = 0.08;
-    const pulse = () => {
-      if (alpha <= 0) return;
-      ctx.fillStyle = `rgba(204,122,0,${alpha.toFixed(3)})`;
-      ctx.fillRect(0, y, width, height);
-      alpha -= 0.004;
-      requestAnimationFrame(pulse);
-    };
-    requestAnimationFrame(pulse);
-  }
-
-  // ── errorFlicker ─────────────────────────────────────────────────────────────
-  // 4 quick red flickers over the error row range.
-
-  errorFlicker(startRow: number, endRow: number, cellHeight: number): void {
-    const { ctx } = this;
-    const y      = startRow * cellHeight;
-    const height = (endRow - startRow + 1) * cellHeight;
-    const { width } = this.logicalSize();
-    const color  = "rgba(255,69,0,0.08)";
-
-    let count = 0;
-    const flicker = () => {
-      if (count >= 8) return; // 4 on + 4 off = 8 frames
-      if (count % 2 === 0) {
-        ctx.fillStyle = color;
-        ctx.fillRect(0, y, width, height);
-      } else {
-        // clear the flicker band — redraw BG color
-        ctx.fillStyle = "rgba(10,10,10,1)";
-        ctx.fillRect(0, y, width, height);
-      }
-      count++;
-      setTimeout(flicker, 40);
-    };
-    flicker();
   }
 }

@@ -14,6 +14,7 @@ import { commandHistory } from "./llm/context";
 import { BootSequence } from "./ascii/boot";
 import { IdleAnimator } from "./ascii/idle";
 import { themeManager } from "./themes/manager";
+import { TransitionEffects } from "./animation/effects";
 import { dispatchCommand } from "./commands/router";
 import type { CommandResult } from "./commands/router";
 import { overlay } from "./overlay/overlay";
@@ -50,6 +51,7 @@ container.removeChild(bootCanvas);
 // ─── Terminal grid ────────────────────────────────────────────────────────────
 
 export const domGrid = new DOMGrid(container);
+const effects = new TransitionEffects(domGrid.getGridElement());
 
 // ── Idle animator (kanji cycling only, no canvas) ──────────────────────────
 const idle = new IdleAnimator();
@@ -190,6 +192,7 @@ window.addEventListener("keydown", async (event) => {
       if (line.startsWith("/")) {
         // ── Slash command — intercept before PTY ──
         event.preventDefault();
+        effects.commandSubmit();
         const result = dispatchCommand(line);
         if (result) {
           const res = await result;
@@ -225,6 +228,7 @@ window.addEventListener("keydown", async (event) => {
           return;
         }
 
+        effects.commandSubmit();
         llm.query(line).catch((err) => console.error("llm.query failed:", err));
         currentInput = "";
         return;
@@ -233,6 +237,7 @@ window.addEventListener("keydown", async (event) => {
       // Regular shell command — record it for context, fire submit effect
       if (line.length > 0) {
         commandHistory.addCommand(line);
+        effects.commandSubmit();
       }
       currentInput = "";
     } else if (key === "Backspace") {

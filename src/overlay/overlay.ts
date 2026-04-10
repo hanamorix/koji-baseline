@@ -1,6 +1,8 @@
 // overlay.ts — DOM overlay manager
 // Replaces Canvas-painted setLlmResponse(). Content renders as HTML over the terminal.
 
+import { renderMarkdown } from "../agent/markdown";
+
 export class TerminalOverlay {
   private container: HTMLElement;
   private currentElement: HTMLElement | null = null;
@@ -37,9 +39,14 @@ export class TerminalOverlay {
       this.currentElement = div;
       this.activate();
     }
-    this.currentElement!.textContent = text;
     if (done) {
+      // Render final text as markdown
+      this.currentElement!.innerHTML = renderMarkdown(text);
       this.currentElement!.classList.remove("streaming");
+      this.currentElement!.classList.add("chat-body"); // Apply markdown styles
+    } else {
+      // While streaming, show plain text (faster, no reflow)
+      this.currentElement!.textContent = text;
     }
   }
 

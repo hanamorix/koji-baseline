@@ -7,6 +7,7 @@
 import { AgentSession, type AgentEvent } from "./agent";
 import { getActiveProvider } from "../providers/provider";
 import { invoke } from "@tauri-apps/api/core";
+import { renderMarkdown } from "./markdown";
 
 // ─── ASCII art for User and Agent labels ─────────────────────────────────────
 
@@ -275,7 +276,7 @@ export class AgentPane {
     div.innerHTML = `<span class="chat-role chat-role-agent">${AGENT_GLYPH} Agent</span>`;
     const body = document.createElement("div");
     body.className = "chat-body";
-    body.textContent = text;
+    body.innerHTML = renderMarkdown(text);
     div.appendChild(body);
     this.chatEl.appendChild(div);
     this.scrollChat();
@@ -308,6 +309,10 @@ export class AgentPane {
   }
 
   private sealStreamBubble(): void {
+    // When stream completes, render the accumulated text as markdown
+    if (this.streamBody && this.streamAccum) {
+      this.streamBody.innerHTML = renderMarkdown(this.streamAccum);
+    }
     this.streamBubble = null;
     this.streamBody = null;
     this.streamAccum = "";

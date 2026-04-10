@@ -29,15 +29,14 @@ impl PtyManager {
 
         let mut cmd = CommandBuilder::new(&shell);
         cmd.env("TERM", "xterm-256color");
-        // Inherit HOME, USER, PATH — the usual suspects
-        if let Ok(home) = std::env::var("HOME") {
-            cmd.env("HOME", home);
-        }
-        if let Ok(user) = std::env::var("USER") {
-            cmd.env("USER", user);
-        }
-        if let Ok(path) = std::env::var("PATH") {
-            cmd.env("PATH", path);
+        cmd.env("COLORTERM", "truecolor");
+        // Inherit the full user environment so tools like Claude Code,
+        // git, node, python, etc. work normally with all their config.
+        for (key, value) in std::env::vars() {
+            // Don't override TERM/COLORTERM we just set
+            if key != "TERM" && key != "COLORTERM" {
+                cmd.env(&key, &value);
+            }
         }
 
         // Spawn on the slave side, then nuke the slave handle — master owns the session now

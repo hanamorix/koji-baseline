@@ -613,31 +613,12 @@ html, body {
   margin-left: 1px;
 }
 
-/* ── Autocomplete ghost text ─────────────────────────────────────────────── */
+/* ── Inline ghost text (shell history suggestions at cursor) ─────────────── */
 
-.autocomplete-ghost {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  pointer-events: none;
-  z-index: 4;
-  white-space: pre;
-  overflow: hidden;
-  height: 1.3em;
-  line-height: 1.3;
-  font-family: inherit;
-  font-size: inherit;
-  display: none;
-}
-
-.ghost-typed {
-  visibility: hidden;
-}
-
-.ghost-completion {
+.inline-ghost {
   color: var(--koji-faded);
-  opacity: 0.6;
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* ── Command transition effects (CSS-only) ──────────────────────────────── */

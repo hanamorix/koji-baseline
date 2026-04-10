@@ -72,7 +72,7 @@ invoke("load_config", { key: "copy_on_select" }).then((val: unknown) => {
   if (val === "false") selection.setCopyOnSelect(false);
 }).catch(() => {});
 const effects = new TransitionEffects(domGrid.getGridElement());
-const autocomplete = new Autocomplete(domGrid.getGridElement());
+const autocomplete = new Autocomplete(domGrid.getGridElement(), domGrid);
 
 // ── Idle animator (kanji cycling only, no canvas) ──────────────────────────
 const idle = new IdleAnimator();

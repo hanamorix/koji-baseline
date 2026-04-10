@@ -160,6 +160,18 @@ export class DOMGrid {
     return this.gridEl;
   }
 
+  getCursorPos(): { row: number; col: number } {
+    return { row: this.cursorRow, col: this.cursorCol };
+  }
+
+  /** Get the DOM element for a viewport row. */
+  getRowElement(row: number): HTMLDivElement | null {
+    if (row >= 0 && row < this.viewportRows.length) {
+      return this.viewportRows[row].el;
+    }
+    return null;
+  }
+
   getScrollElement(): HTMLDivElement {
     return this.scrollEl;
   }

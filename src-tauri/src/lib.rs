@@ -179,6 +179,64 @@ async fn ollama_pull_model(model: String, state: State<'_, OllamaState>) -> Resu
     client.pull_model(model).await
 }
 
+// ─── Filesystem Commands ──────────────────────────────────────────────────────
+
+/// Resolve a path (expanding `~/`) and return whether it is a "file",
+/// "directory", or null if it does not exist / is not accessible.
+#[tauri::command]
+fn check_path_type(path: String) -> Option<String> {
+    let expanded = if path.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            home.join(&path[2..])
+        } else {
+            std::path::PathBuf::from(&path)
+        }
+    } else {
+        std::path::PathBuf::from(&path)
+    };
+    match std::fs::metadata(&expanded) {
+        Ok(meta) if meta.is_dir()  => Some("directory".to_string()),
+        Ok(meta) if meta.is_file() => Some("file".to_string()),
+        _ => None,
+    }
+}
+
+/// Open a URL in the system default browser (macOS `open`).
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg(&url)
+        .spawn()
+        .map_err(|e| format!("Failed to open URL: {e}"))?;
+    Ok(())
+}
+
+/// Open a file in $EDITOR, or fall back to `open` (macOS default app).
+/// Expands `~/` in the path before passing it to the process.
+#[tauri::command]
+fn open_file(path: String) -> Result<(), String> {
+    let expanded = if path.starts_with("~/") {
+        dirs::home_dir()
+            .map(|h| h.join(&path[2..]).to_string_lossy().to_string())
+            .unwrap_or(path.clone())
+    } else {
+        path.clone()
+    };
+
+    if let Ok(editor) = std::env::var("EDITOR") {
+        std::process::Command::new(&editor)
+            .arg(&expanded)
+            .spawn()
+            .map_err(|e| format!("Failed to open in {editor}: {e}"))?;
+    } else {
+        std::process::Command::new("open")
+            .arg(&expanded)
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {e}"))?;
+    }
+    Ok(())
+}
+
 // ─── Theme Commands ───────────────────────────────────────────────────────────
 
 /// Update the terminal engine's colour mapping at runtime.
@@ -266,6 +324,9 @@ pub fn run() {
             set_theme_colors,
             save_config,
             load_config,
+            check_path_type,
+            open_url,
+            open_file,
         ])
         .setup(|app| {
             monitor::start_monitor(app.handle().clone());

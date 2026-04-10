@@ -26,6 +26,7 @@ import { SelectionManager } from "./terminal/selection";
 import { MouseReporter } from "./terminal/mouse";
 import { fontManager } from "./fonts/fonts";
 import { Autocomplete } from "./terminal/autocomplete";
+import { TerminalSearch } from "./terminal/search";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ invoke("load_config", { key: "copy_on_select" }).then((val: unknown) => {
 }).catch(() => {});
 const effects = new TransitionEffects(domGrid.getGridElement());
 const autocomplete = new Autocomplete(domGrid.getGridElement(), domGrid);
+const search = new TerminalSearch(domGrid.getGridElement(), domGrid);
 
 let optionAsMeta = true;
 invoke("load_config", { key: "option_as_meta" }).then((val: unknown) => {
@@ -210,6 +212,23 @@ window.addEventListener("keydown", async (event) => {
       event.preventDefault();
       agentPane.close();
     }
+    return;
+  }
+
+  // ── Cmd+F — search scrollback ────────────────────────────────────────────
+  if (metaKey && key === "f") {
+    event.preventDefault();
+    search.open();
+    return;
+  }
+
+  // ── Cmd+K — clear scrollback ───────────────────────────────────────────
+  if (metaKey && key === "k") {
+    event.preventDefault();
+    domGrid.clearScrollback();
+    const clearSeq = "\x1b[2J\x1b[H";
+    const bytes = Array.from(new TextEncoder().encode(clearSeq));
+    invoke("write_to_pty", { data: bytes }).catch(console.error);
     return;
   }
 

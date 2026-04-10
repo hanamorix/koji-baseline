@@ -289,6 +289,13 @@ export class DOMGrid {
     this.maxScrollback = lines;
   }
 
+  clearScrollback(): void {
+    for (const row of this.scrollbackRows) {
+      row.remove();
+    }
+    this.scrollbackRows = [];
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────
 
   private applyFontStyles(): void {

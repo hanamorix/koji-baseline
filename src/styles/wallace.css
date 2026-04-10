@@ -764,3 +764,69 @@ html, body {
 .terminal-grid.effect-bell {
   animation: bell-flash 0.15s ease-out;
 }
+
+/* ── Search bar ──────────────────────────────────────────────────────────── */
+
+.search-bar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  background: rgba(15, 15, 15, 0.96);
+  border: 1px solid var(--koji-dim);
+  border-radius: 4px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  font-size: 12px;
+}
+
+.search-bar input {
+  background: transparent;
+  border: 1px solid var(--koji-deep);
+  border-radius: 3px;
+  color: var(--koji-bright);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 3px 8px;
+  width: 200px;
+  outline: none;
+}
+
+.search-bar input:focus {
+  border-color: var(--koji-dim);
+}
+
+.search-bar .search-count {
+  color: var(--koji-faded);
+  font-size: 11px;
+  min-width: 50px;
+}
+
+.search-bar button {
+  background: transparent;
+  border: 1px solid var(--koji-deep);
+  border-radius: 3px;
+  color: var(--koji-warm);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.search-bar button:hover {
+  border-color: var(--koji-dim);
+  color: var(--koji-bright);
+}
+
+.search-match {
+  background: rgba(255, 140, 0, 0.2) !important;
+  border-radius: 1px;
+}
+
+.search-match-active {
+  background: rgba(255, 140, 0, 0.4) !important;
+  border-radius: 1px;
+}

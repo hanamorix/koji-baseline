@@ -157,8 +157,17 @@ listen("theme-applied", () => {
 listen<GridSnapshot>("terminal-output", (event) => {
   mouse.updateMode(event.payload.mouse_mode);
   domGrid.render(event.payload);
+  if (event.payload.title) {
+    document.title = event.payload.title;
+  }
 }).catch((err) => {
   console.warn("terminal-output listener failed:", err);
+});
+
+listen("terminal-bell", () => {
+  effects.bell();
+}).catch((err) => {
+  console.warn("terminal-bell listener failed:", err);
 });
 
 listen<RenderCell[][]>("scrollback-append", (event) => {

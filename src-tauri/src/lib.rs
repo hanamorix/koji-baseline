@@ -71,6 +71,8 @@ fn init_terminal(
                 }
             };
 
+            let has_bell = terminal::TerminalEngine::check_bell(&buf[..n]);
+
             let (snapshot, scrollback) = {
                 let mut eng_opt = engine_arc.lock();
                 if let Some(ref mut eng) = *eng_opt {
@@ -91,6 +93,10 @@ fn init_terminal(
             if let Some(snap) = snapshot {
                 // Fire and forget — if the window closed, we'll catch it next iteration
                 let _ = app.emit("terminal-output", &snap);
+            }
+
+            if has_bell {
+                let _ = app.emit("terminal-bell", ());
             }
         }
     });

@@ -27,6 +27,7 @@ export interface GridSnapshot {
   cols: number;
   is_alt_screen: boolean;
   mouse_mode: number;
+  title: string;
 }
 
 interface RowState {

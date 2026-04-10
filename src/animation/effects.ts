@@ -28,6 +28,16 @@ export class TransitionEffects {
     this.applyRowEffect("effect-error", startRow, endRow);
   }
 
+  /** Soft amber flash for terminal bell. */
+  bell(): void {
+    this.gridEl.classList.remove("effect-bell");
+    void this.gridEl.offsetWidth;
+    this.gridEl.classList.add("effect-bell");
+    this.gridEl.addEventListener("animationend", () => {
+      this.gridEl.classList.remove("effect-bell");
+    }, { once: true });
+  }
+
   private applyRowEffect(cls: string, startRow: number, endRow: number): void {
     const rows = this.gridEl.querySelectorAll(".grid-row");
     for (let i = startRow; i <= endRow && i < rows.length; i++) {

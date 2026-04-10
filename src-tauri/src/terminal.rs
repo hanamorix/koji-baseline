@@ -43,6 +43,7 @@ pub struct GridSnapshot {
     pub cols: usize,
     pub is_alt_screen: bool,
     pub mouse_mode: u8,
+    pub title: String,
 }
 
 // ─── Named colour palette ──────────────────────────────────────────────────
@@ -233,6 +234,11 @@ impl TerminalEngine {
         }
     }
 
+    /// Check if raw bytes contain a BEL character.
+    pub fn check_bell(bytes: &[u8]) -> bool {
+        bytes.contains(&0x07)
+    }
+
     /// Push raw PTY bytes through the VTE parser into the terminal state machine.
     pub fn process_bytes(&mut self, bytes: &[u8]) {
         self.parser.advance(&mut self.term, bytes);
@@ -275,6 +281,10 @@ impl TerminalEngine {
             m
         };
 
+        // alacritty_terminal 0.25.1 stores title privately with no public accessor,
+        // so we default to empty. OSC 0/1/2 title support requires a custom EventListener.
+        let title = String::new();
+
         GridSnapshot {
             cells,
             cursor: CursorPos { row: cursor_row, col: cursor_col },
@@ -282,6 +292,7 @@ impl TerminalEngine {
             cols: self.cols,
             is_alt_screen: mode.contains(TermMode::ALT_SCREEN),
             mouse_mode,
+            title,
         }
     }
 

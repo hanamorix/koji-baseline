@@ -755,3 +755,12 @@ html, body {
 .grid-row.effect-complete {
   animation: completion-pulse 0.4s ease-out;
 }
+
+@keyframes bell-flash {
+  0% { background: rgba(255, 140, 0, 0.04); }
+  100% { background: transparent; }
+}
+
+.terminal-grid.effect-bell {
+  animation: bell-flash 0.15s ease-out;
+}

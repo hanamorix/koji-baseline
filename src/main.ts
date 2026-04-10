@@ -74,6 +74,11 @@ invoke("load_config", { key: "copy_on_select" }).then((val: unknown) => {
 const effects = new TransitionEffects(domGrid.getGridElement());
 const autocomplete = new Autocomplete(domGrid.getGridElement(), domGrid);
 
+let optionAsMeta = true;
+invoke("load_config", { key: "option_as_meta" }).then((val: unknown) => {
+  if (val === "false") optionAsMeta = false;
+}).catch(() => {});
+
 // ── Idle animator (kanji cycling only, no canvas) ──────────────────────────
 const idle = new IdleAnimator();
 idle.onStateChange((isIdle, kanji) => {
@@ -367,6 +372,11 @@ window.addEventListener("keydown", async (event) => {
     return;
   }
 
+  // Alt key routing — if option_as_meta is off, let native handling occur
+  if (event.altKey && !optionAsMeta) {
+    return; // Let browser handle Option key for special characters
+  }
+
   const seq = keyToAnsi(event);
   if (seq === null) return;
 
@@ -380,7 +390,17 @@ window.addEventListener("keydown", async (event) => {
 // ─── keyToAnsi ────────────────────────────────────────────────────────────────
 
 function keyToAnsi(event: KeyboardEvent): string | null {
-  const { key, ctrlKey } = event;
+  const { key, ctrlKey, altKey } = event;
+
+  // Alt/Option as Meta — send ESC prefix + key
+  if (altKey && !ctrlKey && !event.metaKey) {
+    if (key === "Backspace") return "\x1b\x7f"; // Meta-Backspace = delete word back
+    if (key.length === 1) {
+      // Use raw key letter, not composed character (macOS Option produces special chars)
+      const rawKey = event.code.startsWith("Key") ? event.code.slice(3).toLowerCase() : key;
+      return "\x1b" + rawKey;
+    }
+  }
 
   // Ctrl+key combos (control characters)
   if (ctrlKey && key.length === 1) {

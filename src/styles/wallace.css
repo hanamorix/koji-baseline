@@ -182,7 +182,6 @@ html, body {
   position: relative;
   z-index: 1;
   display: block;
-  image-rendering: pixelated;
 }
 
 /* ─── Dashboard bottom ───────────────────────────────────────────────────────── */

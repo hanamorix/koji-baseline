@@ -62,7 +62,6 @@ export class TerminalGrid {
   constructor(container: HTMLElement) {
     this.canvas = document.createElement("canvas");
     this.canvas.style.display = "block";
-    this.canvas.style.imageRendering = "pixelated";
     container.appendChild(this.canvas);
 
     const ctx = this.canvas.getContext("2d");
@@ -77,14 +76,24 @@ export class TerminalGrid {
   // ─── Public API ─────────────────────────────────────────────────────────────
 
   resize(rows: number, cols: number): void {
-    this.canvas.width = cols * CELL_WIDTH;
-    this.canvas.height = rows * CELL_HEIGHT;
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = cols * CELL_WIDTH * dpr;
+    this.canvas.height = rows * CELL_HEIGHT * dpr;
+    this.canvas.style.width = `${cols * CELL_WIDTH}px`;
+    this.canvas.style.height = `${rows * CELL_HEIGHT}px`;
+    this.ctx.scale(dpr, dpr);
+
+    // Immediately redraw to avoid blank flash after resize
+    if (this.lastSnapshot) {
+      this.drawGrid(this.lastSnapshot);
+    }
   }
 
   render(snapshot: GridSnapshot): void {
+    const dpr = window.devicePixelRatio || 1;
     if (
-      this.canvas.width !== snapshot.cols * CELL_WIDTH ||
-      this.canvas.height !== snapshot.rows * CELL_HEIGHT
+      this.canvas.width !== snapshot.cols * CELL_WIDTH * dpr ||
+      this.canvas.height !== snapshot.rows * CELL_HEIGHT * dpr
     ) {
       this.resize(snapshot.rows, snapshot.cols);
     }
@@ -130,7 +139,7 @@ export class TerminalGrid {
     const tick = (timestamp: number) => {
       if (this.cursorAnimStart === null) this.cursorAnimStart = timestamp;
       const elapsed = (timestamp - this.cursorAnimStart) / 2000;
-      this.cursorOpacity = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(elapsed * Math.PI * 2));
+      this.cursorOpacity = 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(elapsed * Math.PI * 2));
 
       if (this.lastSnapshot) {
         this.drawCursor(this.lastSnapshot);
@@ -193,18 +202,21 @@ export class TerminalGrid {
     const { text, afterRow } = this.llmState;
     if (!text) return;
 
-    const { ctx, canvas } = this;
+    const { ctx } = this;
+    // Use logical pixel dimensions (CSS size), not physical canvas dimensions
+    const logicalWidth = parseFloat(this.canvas.style.width) || this.canvas.width;
+    const logicalHeight = parseFloat(this.canvas.style.height) || this.canvas.height;
     const startY = (afterRow + 1) * CELL_HEIGHT;
 
     // Hard-clip to canvas bottom — don't render off-screen
-    if (startY >= canvas.height) return;
+    if (startY >= logicalHeight) return;
 
-    const maxWidth = canvas.width - LLM_PAD_LEFT - 4;
+    const maxWidth = logicalWidth - LLM_PAD_LEFT - 4;
 
     // Left border
     ctx.save();
     ctx.fillStyle = LLM_BORDER;
-    ctx.fillRect(0, startY, LLM_BORDER_WIDTH, canvas.height - startY);
+    ctx.fillRect(0, startY, LLM_BORDER_WIDTH, logicalHeight - startY);
 
     // Wrap and render text lines
     ctx.fillStyle = LLM_FG;
@@ -216,7 +228,7 @@ export class TerminalGrid {
     let y = startY + 2; // 2px padding from border top
 
     for (const line of lines) {
-      if (y + CELL_HEIGHT > canvas.height) break; // ran out of canvas
+      if (y + CELL_HEIGHT > logicalHeight) break; // ran out of canvas
       ctx.fillText(line, LLM_PAD_LEFT, y);
       y += CELL_HEIGHT;
     }
@@ -225,43 +237,18 @@ export class TerminalGrid {
   }
 
   private drawCursor(snapshot: GridSnapshot): void {
-    const { ctx } = this;
     const { row, col } = snapshot.cursor;
-
     if (row >= snapshot.rows || col >= snapshot.cols) return;
 
     const x = col * CELL_WIDTH;
     const y = row * CELL_HEIGHT;
 
-    const cell = snapshot.cells[row]?.[col];
-    if (cell) {
-      ctx.fillStyle = rgbToHex(cell.bg);
-      ctx.fillRect(x, y, CELL_WIDTH, CELL_HEIGHT);
-      if (cell.character && cell.character.trim() !== "") {
-        ctx.fillStyle = rgbToHex(cell.fg);
-        ctx.font = buildFont(cell.bold, cell.italic);
-        ctx.globalAlpha = cell.dim ? 0.5 : 1.0;
-        ctx.fillText(cell.character, x, y + 1);
-        ctx.globalAlpha = 1.0;
-      }
-    }
-
-    ctx.save();
-    ctx.globalAlpha = this.cursorOpacity;
-    ctx.shadowColor = "#ff8c00";
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = "#ff8c00";
-    ctx.fillRect(x, y, CELL_WIDTH, CELL_HEIGHT);
-    ctx.restore();
-
-    if (cell && cell.character && cell.character.trim() !== "") {
-      ctx.save();
-      ctx.globalAlpha = this.cursorOpacity;
-      ctx.fillStyle = "#0a0a0a";
-      ctx.font = buildFont(cell.bold, cell.italic);
-      ctx.fillText(cell.character, x, y + 1);
-      ctx.restore();
-    }
+    // Clean amber beam cursor — 2px vertical line
+    this.ctx.save();
+    this.ctx.globalAlpha = this.cursorOpacity;
+    this.ctx.fillStyle = "#ff8c00";
+    this.ctx.fillRect(x, y, 2, CELL_HEIGHT);
+    this.ctx.restore();
   }
 }
 

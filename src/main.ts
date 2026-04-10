@@ -117,18 +117,20 @@ invoke("init_terminal", { rows: initRows, cols: initCols }).catch((err) => {
 
 // ─── Resize observer — grid adapts to window ─────────────────────────────────
 
+let resizeTimer: number | null = null;
 const resizeObserver = new ResizeObserver((entries) => {
-  for (const entry of entries) {
-    const { width, height } = entry.contentRect;
-    const cols = Math.floor(width / 9);   // CELL_WIDTH  = 9px
-    const rows = Math.floor(height / 18); // CELL_HEIGHT = 18px
-    if (cols > 0 && rows > 0) {
-      grid.resize(rows, cols);
-      invoke("resize_terminal", { rows, cols }).catch((err) => {
-        console.warn("resize_terminal failed:", err);
-      });
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect;
+      const cols = Math.floor(width / 9);   // CELL_WIDTH  = 9px
+      const rows = Math.floor(height / 18); // CELL_HEIGHT = 18px
+      if (cols > 0 && rows > 0) {
+        grid.resize(rows, cols);
+        invoke("resize_terminal", { rows, cols }).catch(console.warn);
+      }
     }
-  }
+  }, 50);
 });
 resizeObserver.observe(container);
 

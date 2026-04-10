@@ -4,8 +4,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { TerminalGrid, GridSnapshot } from "./terminal/grid";
+import { initDashboard } from "./dashboard/status-bar";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
+
+// Start clock + system-stats listener before anything else
+initDashboard();
 
 const container = document.getElementById("terminal-container");
 if (!container) throw new Error("#terminal-container not found");

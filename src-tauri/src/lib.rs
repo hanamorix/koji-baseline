@@ -1,6 +1,7 @@
 // lib.rs — Koji Baseline entry point
 // Task 4: PTY → TerminalEngine → Canvas. I/O thread bridges the gap.
 
+pub mod monitor;
 pub mod pty;
 pub mod terminal;
 
@@ -120,6 +121,10 @@ pub fn run() {
             write_to_pty,
             resize_terminal,
         ])
+        .setup(|app| {
+            monitor::start_monitor(app.handle().clone());
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

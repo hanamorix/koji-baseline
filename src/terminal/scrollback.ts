@@ -15,7 +15,7 @@
 export function applyScrollbackFade(
   fg: [number, number, number],
   row: number,
-  totalRows: number,
+  _totalRows: number,
   cursorRow: number,
 ): [number, number, number] {
   // Rows at or below cursor — full brightness

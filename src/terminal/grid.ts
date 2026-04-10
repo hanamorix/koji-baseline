@@ -1,6 +1,7 @@
 // grid.ts — Canvas 2D terminal grid renderer
 // Paints the full GridSnapshot every frame. Cursor breathes. Wallace amber on.
 // Scrollback fade dims lines above the cursor — atmosphere layer 1.
+// Task 10: Inline LLM response block rendered below the cursor row.
 
 import { applyScrollbackFade } from "./scrollback";
 
@@ -8,6 +9,12 @@ const CELL_WIDTH = 9;
 const CELL_HEIGHT = 18;
 const FONT_SIZE = 14;
 const FONT_FAMILY = "'JetBrains Mono', 'Courier New', monospace";
+
+// LLM response render config
+const LLM_FG = "#cc7a00";
+const LLM_BORDER = "#4a3a1a";
+const LLM_BORDER_WIDTH = 2;
+const LLM_PAD_LEFT = 6; // pixels from left edge (border + gap)
 
 // ─── Types (mirror Rust GridSnapshot) ─────────────────────────────────────────
 
@@ -33,6 +40,14 @@ export interface GridSnapshot {
   cols: number;
 }
 
+// ─── LLM overlay state ────────────────────────────────────────────────────────
+
+interface LlmState {
+  text: string;
+  done: boolean;
+  afterRow: number;
+}
+
 // ─── TerminalGrid ──────────────────────────────────────────────────────────────
 
 export class TerminalGrid {
@@ -40,8 +55,9 @@ export class TerminalGrid {
   private ctx: CanvasRenderingContext2D;
   private cursorOpacity = 1.0;
   private cursorAnimStart: number | null = null;
-  private rafId: number | null = null;
+  private rafHandle = 0;
   private lastSnapshot: GridSnapshot | null = null;
+  private llmState: LlmState | null = null;
 
   constructor(container: HTMLElement) {
     this.canvas = document.createElement("canvas");
@@ -66,7 +82,6 @@ export class TerminalGrid {
   }
 
   render(snapshot: GridSnapshot): void {
-    // Resize canvas if grid dimensions changed
     if (
       this.canvas.width !== snapshot.cols * CELL_WIDTH ||
       this.canvas.height !== snapshot.rows * CELL_HEIGHT
@@ -75,6 +90,20 @@ export class TerminalGrid {
     }
     this.lastSnapshot = snapshot;
     this.drawGrid(snapshot);
+  }
+
+  /** Called by the LLM panel on every streaming token batch. */
+  setLlmResponse(text: string, done: boolean, afterRow: number): void {
+    this.llmState = { text, done, afterRow };
+    // Redraw immediately so the user sees tokens arriving
+    if (this.lastSnapshot) {
+      this.drawGrid(this.lastSnapshot);
+    }
+  }
+
+  /** Expose the last snapshot so main.ts can read cursor position. */
+  getLastSnapshot(): GridSnapshot | null {
+    return this.lastSnapshot;
   }
 
   getCellFromClick(event: MouseEvent): { row: number; col: number } {
@@ -90,23 +119,26 @@ export class TerminalGrid {
     return this.canvas;
   }
 
+  /** Cancel the cursor animation RAF — call when unmounting the grid. */
+  destroy(): void {
+    if (this.rafHandle) cancelAnimationFrame(this.rafHandle);
+  }
+
   // ─── Private rendering ───────────────────────────────────────────────────────
 
   private startCursorAnimation(): void {
     const tick = (timestamp: number) => {
       if (this.cursorAnimStart === null) this.cursorAnimStart = timestamp;
-      // Pulse 0.4 → 1.0 over ~2 seconds (sine wave, always positive)
       const elapsed = (timestamp - this.cursorAnimStart) / 2000;
       this.cursorOpacity = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(elapsed * Math.PI * 2));
 
-      // Redraw only the cursor cell if we have a snapshot
       if (this.lastSnapshot) {
         this.drawCursor(this.lastSnapshot);
       }
 
-      this.rafId = requestAnimationFrame(tick);
+      this.rafHandle = requestAnimationFrame(tick);
     };
-    this.rafId = requestAnimationFrame(tick);
+    this.rafHandle = requestAnimationFrame(tick);
   }
 
   private drawGrid(snapshot: GridSnapshot): void {
@@ -127,7 +159,6 @@ export class TerminalGrid {
         ctx.fillStyle = rgbToHex(cell.bg);
         ctx.fillRect(x, y, CELL_WIDTH, CELL_HEIGHT);
 
-        // Character — apply scrollback fade above cursor row
         if (cell.character && cell.character.trim() !== "") {
           const fadedFg = applyScrollbackFade(cell.fg, row, snapshot.rows, snapshot.cursor.row);
           ctx.fillStyle = rgbToHex(fadedFg);
@@ -136,7 +167,6 @@ export class TerminalGrid {
           ctx.fillText(cell.character, x, y + 1);
           ctx.globalAlpha = 1.0;
 
-          // Underline
           if (cell.underline) {
             ctx.fillStyle = rgbToHex(fadedFg);
             ctx.fillRect(x, y + CELL_HEIGHT - 2, CELL_WIDTH, 1);
@@ -145,21 +175,64 @@ export class TerminalGrid {
       }
     }
 
-    // Draw cursor on top
+    // LLM overlay — rendered after grid cells so it sits on top
+    this.drawLlmResponse();
+
+    // Cursor on top of everything
     this.drawCursor(snapshot);
+  }
+
+  /**
+   * Renders the LLM response text below the cursor row with:
+   *   - 2px amber-dark left border
+   *   - Text in amber (#cc7a00)
+   *   - Word-wrapping at canvas width
+   */
+  private drawLlmResponse(): void {
+    if (!this.llmState || !this.lastSnapshot) return;
+    const { text, afterRow } = this.llmState;
+    if (!text) return;
+
+    const { ctx, canvas } = this;
+    const startY = (afterRow + 1) * CELL_HEIGHT;
+
+    // Hard-clip to canvas bottom — don't render off-screen
+    if (startY >= canvas.height) return;
+
+    const maxWidth = canvas.width - LLM_PAD_LEFT - 4;
+
+    // Left border
+    ctx.save();
+    ctx.fillStyle = LLM_BORDER;
+    ctx.fillRect(0, startY, LLM_BORDER_WIDTH, canvas.height - startY);
+
+    // Wrap and render text lines
+    ctx.fillStyle = LLM_FG;
+    ctx.font = `normal normal ${FONT_SIZE}px ${FONT_FAMILY}`;
+    ctx.textBaseline = "top";
+    ctx.globalAlpha = 1.0;
+
+    const lines = wrapText(ctx, text, maxWidth);
+    let y = startY + 2; // 2px padding from border top
+
+    for (const line of lines) {
+      if (y + CELL_HEIGHT > canvas.height) break; // ran out of canvas
+      ctx.fillText(line, LLM_PAD_LEFT, y);
+      y += CELL_HEIGHT;
+    }
+
+    ctx.restore();
   }
 
   private drawCursor(snapshot: GridSnapshot): void {
     const { ctx } = this;
     const { row, col } = snapshot.cursor;
 
-    // Bounds check
     if (row >= snapshot.rows || col >= snapshot.cols) return;
 
     const x = col * CELL_WIDTH;
     const y = row * CELL_HEIGHT;
 
-    // Redraw the cell underneath so we don't stack alphas
     const cell = snapshot.cells[row]?.[col];
     if (cell) {
       ctx.fillStyle = rgbToHex(cell.bg);
@@ -173,7 +246,6 @@ export class TerminalGrid {
       }
     }
 
-    // Cursor block — amber glow, breathing opacity
     ctx.save();
     ctx.globalAlpha = this.cursorOpacity;
     ctx.shadowColor = "#ff8c00";
@@ -182,7 +254,6 @@ export class TerminalGrid {
     ctx.fillRect(x, y, CELL_WIDTH, CELL_HEIGHT);
     ctx.restore();
 
-    // Character on top of cursor in dark ink so it's readable
     if (cell && cell.character && cell.character.trim() !== "") {
       ctx.save();
       ctx.globalAlpha = this.cursorOpacity;
@@ -208,4 +279,41 @@ function buildFont(bold: boolean, italic: boolean): string {
   const weight = bold ? "bold" : "normal";
   const style = italic ? "italic" : "normal";
   return `${style} ${weight} ${FONT_SIZE}px ${FONT_FAMILY}`;
+}
+
+/**
+ * Splits `text` into lines that fit within `maxWidth` pixels.
+ * Honours existing newlines first, then wraps long lines by word.
+ */
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string[] {
+  const result: string[] = [];
+
+  for (const paragraph of text.split("\n")) {
+    if (paragraph === "") {
+      result.push("");
+      continue;
+    }
+
+    const words = paragraph.split(" ");
+    let line = "";
+
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        line = candidate;
+      } else {
+        if (line) result.push(line);
+        // If a single word is wider than maxWidth, push it anyway
+        line = word;
+      }
+    }
+
+    if (line) result.push(line);
+  }
+
+  return result;
 }

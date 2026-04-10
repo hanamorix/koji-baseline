@@ -1,4 +1,6 @@
-// autocomplete.ts — Ghost-text autosuggestion for slash commands and shell history
+// autocomplete.ts — Command input bar with ghost-text autosuggestion
+// Shows a visible input line when typing / or >> commands (which don't go to PTY).
+// Shows ghost suggestions from slash commands and shell history.
 
 const SLASH_COMMANDS = [
   "/help",
@@ -16,42 +18,72 @@ const SLASH_COMMANDS = [
 ];
 
 export class Autocomplete {
-  private ghostEl: HTMLDivElement;
+  private barEl: HTMLDivElement;
+  private prefixEl: HTMLSpanElement;
+  private textEl: HTMLSpanElement;
+  private ghostEl: HTMLSpanElement;
+  private cursorEl: HTMLSpanElement;
   private currentSuggestion = "";
   private shellHistory: string[] = [];
-  private visible = false;
+  private barVisible = false;
 
   constructor(container: HTMLElement) {
-    this.ghostEl = document.createElement("div");
-    this.ghostEl.className = "autocomplete-ghost";
-    container.appendChild(this.ghostEl);
+    // Build the command input bar
+    this.barEl = document.createElement("div");
+    this.barEl.className = "command-input-bar";
+
+    this.prefixEl = document.createElement("span");
+    this.prefixEl.className = "input-prefix";
+
+    this.textEl = document.createElement("span");
+    this.textEl.className = "input-text";
+
+    this.ghostEl = document.createElement("span");
+    this.ghostEl.className = "input-ghost";
+
+    this.cursorEl = document.createElement("span");
+    this.cursorEl.className = "input-cursor";
+
+    this.barEl.appendChild(this.prefixEl);
+    this.barEl.appendChild(this.textEl);
+    this.barEl.appendChild(this.cursorEl);
+    this.barEl.appendChild(this.ghostEl);
+
+    container.appendChild(this.barEl);
   }
 
   /** Add a command to shell history (called on Enter for non-slash commands). */
   addToHistory(cmd: string): void {
-    // Deduplicate: remove existing occurrence, push to end
     const idx = this.shellHistory.indexOf(cmd);
     if (idx >= 0) this.shellHistory.splice(idx, 1);
     this.shellHistory.push(cmd);
-    // Cap at 100 entries
     if (this.shellHistory.length > 100) this.shellHistory.shift();
   }
 
-  /** Update the ghost suggestion based on current input. Returns the full suggestion or empty. */
+  /** Update display and ghost suggestion based on current input. */
   update(input: string): string {
     if (!input) {
-      this.hide();
+      this.hideBar();
+      this.currentSuggestion = "";
       return "";
     }
 
-    let match = "";
-
-    if (input.startsWith("/")) {
-      // Match against slash commands (case-insensitive prefix)
-      const lower = input.toLowerCase();
-      match = SLASH_COMMANDS.find((cmd) => cmd.toLowerCase().startsWith(lower) && cmd.toLowerCase() !== lower) ?? "";
+    // Show the command input bar for slash commands and >> queries
+    const isIntercepted = input.startsWith("/") || input.startsWith(">>");
+    if (isIntercepted) {
+      this.showBar(input);
     } else {
-      // Match against shell history (most recent first, prefix match)
+      this.hideBar();
+    }
+
+    // Find suggestion
+    let match = "";
+    if (input.startsWith("/")) {
+      const lower = input.toLowerCase();
+      match = SLASH_COMMANDS.find((cmd) =>
+        cmd.toLowerCase().startsWith(lower) && cmd.toLowerCase() !== lower
+      ) ?? "";
+    } else {
       for (let i = this.shellHistory.length - 1; i >= 0; i--) {
         if (this.shellHistory[i].startsWith(input) && this.shellHistory[i] !== input) {
           match = this.shellHistory[i];
@@ -61,37 +93,29 @@ export class Autocomplete {
     }
 
     if (match) {
-      // Show only the completion portion (what the user hasn't typed yet)
-      const completion = match.slice(input.length);
       this.currentSuggestion = match;
-      this.ghostEl.textContent = input + completion;
-      // Style: show the typed part as invisible (same width spacer), completion as dim
-      this.ghostEl.innerHTML =
-        `<span class="ghost-typed">${escapeHTML(input)}</span><span class="ghost-completion">${escapeHTML(completion)}</span>`;
-      this.show();
+      const completion = match.slice(input.length);
+      this.ghostEl.textContent = completion;
     } else {
       this.currentSuggestion = "";
-      this.hide();
+      this.ghostEl.textContent = "";
     }
 
     return this.currentSuggestion;
   }
 
-  /** Accept the current suggestion. Returns the full command or empty if no suggestion. */
+  /** Accept the current suggestion. Returns the full command or empty. */
   accept(): string {
     const suggestion = this.currentSuggestion;
-    this.hide();
     this.currentSuggestion = "";
     return suggestion;
   }
 
-  /** Dismiss the ghost text. */
+  /** Dismiss everything. */
   hide(): void {
-    if (this.visible) {
-      this.ghostEl.style.display = "none";
-      this.visible = false;
-    }
+    this.hideBar();
     this.currentSuggestion = "";
+    this.ghostEl.textContent = "";
   }
 
   /** Get current suggestion without accepting. */
@@ -99,14 +123,28 @@ export class Autocomplete {
     return this.currentSuggestion;
   }
 
-  private show(): void {
-    if (!this.visible) {
-      this.ghostEl.style.display = "";
-      this.visible = true;
+  private showBar(input: string): void {
+    if (input.startsWith(">>")) {
+      this.prefixEl.textContent = ">>";
+      this.textEl.textContent = input.slice(2);
+    } else if (input.startsWith("/")) {
+      this.prefixEl.textContent = "/";
+      this.textEl.textContent = input.slice(1);
+    }
+
+    if (!this.barVisible) {
+      this.barEl.classList.add("active");
+      this.barVisible = true;
     }
   }
-}
 
-function escapeHTML(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  private hideBar(): void {
+    if (this.barVisible) {
+      this.barEl.classList.remove("active");
+      this.barVisible = false;
+      this.textEl.textContent = "";
+      this.ghostEl.textContent = "";
+      this.prefixEl.textContent = "";
+    }
+  }
 }

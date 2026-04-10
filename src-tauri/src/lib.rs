@@ -1,20 +1,24 @@
 // lib.rs — Koji Baseline entry point
 // Task 4: PTY → TerminalEngine → Canvas. I/O thread bridges the gap.
+// Task 8: Ollama client wired in — streaming LLM queries from the terminal.
 
 pub mod monitor;
+pub mod ollama;
 pub mod pty;
 pub mod terminal;
 
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State};
+use tokio::sync::Mutex as AsyncMutex;
 
 // ─── App State ────────────────────────────────────────────────────────────────
 
 struct PtyState(Arc<Mutex<Option<pty::PtyManager>>>);
 struct EngineState(Arc<Mutex<Option<terminal::TerminalEngine>>>);
+struct OllamaState(Arc<AsyncMutex<ollama::OllamaClient>>);
 
-// ─── Commands ─────────────────────────────────────────────────────────────────
+// ─── PTY Commands ─────────────────────────────────────────────────────────────
 
 /// Spin up a PTY + TerminalEngine, then launch the I/O thread that pumps bytes
 /// from the shell into the engine and fires `terminal-output` events at the frontend.
@@ -109,6 +113,49 @@ fn resize_terminal(
     }
 }
 
+// ─── Ollama Commands ──────────────────────────────────────────────────────────
+
+/// Build message list from prompt + context strings, then stream the response.
+/// Emits "llm-chunk" and "llm-status" events — no return value needed.
+#[tauri::command]
+async fn llm_query(
+    prompt: String,
+    context: Vec<String>,
+    app: tauri::AppHandle,
+    state: State<'_, OllamaState>,
+) -> Result<(), String> {
+    let mut messages: Vec<ollama::ChatMessage> = context
+        .into_iter()
+        .map(|c| ollama::ChatMessage {
+            role: "user".to_string(),
+            content: c,
+        })
+        .collect();
+
+    messages.push(ollama::ChatMessage {
+        role: "user".to_string(),
+        content: prompt,
+    });
+
+    let client = state.0.lock().await;
+    client.chat_stream(messages, &app).await
+}
+
+/// Hot-swap the active model without restarting.
+#[tauri::command]
+async fn switch_model(model: String, state: State<'_, OllamaState>) -> Result<(), String> {
+    let mut client = state.0.lock().await;
+    client.set_model(model);
+    Ok(())
+}
+
+/// Ping Ollama and return its status — used by the frontend on startup.
+#[tauri::command]
+async fn check_ollama(state: State<'_, OllamaState>) -> Result<ollama::OllamaStatus, String> {
+    let client = state.0.lock().await;
+    Ok(client.check_status().await)
+}
+
 // ─── App bootstrap ────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -116,10 +163,16 @@ pub fn run() {
     tauri::Builder::default()
         .manage(PtyState(Arc::new(Mutex::new(None))))
         .manage(EngineState(Arc::new(Mutex::new(None))))
+        .manage(OllamaState(Arc::new(AsyncMutex::new(
+            ollama::OllamaClient::new(),
+        ))))
         .invoke_handler(tauri::generate_handler![
             init_terminal,
             write_to_pty,
             resize_terminal,
+            llm_query,
+            switch_model,
+            check_ollama,
         ])
         .setup(|app| {
             monitor::start_monitor(app.handle().clone());

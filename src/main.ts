@@ -22,6 +22,7 @@ import { openMenu } from "./overlay/menu";
 import type { MenuResult } from "./overlay/menu";
 import { agentPane } from "./agent/pane";
 import { llmOnboarding } from "./llm/onboarding";
+import { SelectionManager } from "./terminal/selection";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,10 @@ container.removeChild(bootCanvas);
 // ─── Terminal grid ────────────────────────────────────────────────────────────
 
 export const domGrid = new DOMGrid(container);
+const selection = new SelectionManager(domGrid.getGridElement());
+invoke("load_config", { key: "copy_on_select" }).then((val: unknown) => {
+  if (val === "false") selection.setCopyOnSelect(false);
+}).catch(() => {});
 const effects = new TransitionEffects(domGrid.getGridElement());
 
 // ── Idle animator (kanji cycling only, no canvas) ──────────────────────────
@@ -162,24 +167,22 @@ window.addEventListener("keydown", async (event) => {
     return;
   }
 
-  // ── Cmd+V — paste from clipboard ─────────────────────────────────────────
+  // ── Cmd+V — paste from clipboard with bracketed paste escapes ───────────
   if (metaKey && key === "v") {
     event.preventDefault();
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        const bytes = Array.from(new TextEncoder().encode(text));
-        await invoke("write_to_pty", { data: bytes });
-      }
-    } catch {
-      // Clipboard read denied or empty — silent fail
-    }
+    selection.handlePaste().catch(console.error);
     return;
   }
 
-  // ── Cmd+C — selection not yet implemented, just swallow it ───────────────
+  // ── Cmd+C — copy selection if present, else send SIGINT (^C) ─────────────
   if (metaKey && key === "c") {
     event.preventDefault();
+    selection.handleCopy().then((copied) => {
+      if (!copied) {
+        // No selection — send ^C (SIGINT)
+        invoke("write_to_pty", { data: [3] }).catch(console.error);
+      }
+    });
     return;
   }
 

@@ -1,121 +1,78 @@
-// idle.ts — Idle animator: holographic scan line + kanji cycling
-// Triggers after 30 s of no input.  Resets on keydown / mousemove.
+// idle.ts — Kanji cycling idle animation (no scan line, no RAF)
 
 const IDLE_THRESHOLD_MS = 30_000;
+const KANJI_CYCLE = "光路影幻夢霧雨風雷炎氷星月闇";
+const KANJI_INTERVAL_MS = 800;
 
-const KANJI_CYCLE = Array.from("光路影幻夢霧雨風雷炎氷星月闇");
-
-type StateChangeCallback = (idle: boolean) => void;
+type StateCallback = (idle: boolean, kanji?: string) => void;
 
 export class IdleAnimator {
-  private canvas: HTMLCanvasElement | null = null;
-  private lastInput: number = Date.now();
-  private isIdle: boolean   = false;
-  private rafId: number     = 0;
-  private kanjiIndex: number = 0;
+  private lastInput = Date.now();
+  private isIdle = false;
+  private kanjiIndex = 0;
   private kanjiInterval: ReturnType<typeof setInterval> | null = null;
-  private stateCallbacks: StateChangeCallback[] = [];
-
-  // ── event wiring ─────────────────────────────────────────────────────────────
+  private checkInterval: ReturnType<typeof setInterval> | null = null;
+  private stateCallbacks: StateCallback[] = [];
 
   constructor() {
     const reset = () => this.resetIdle();
-    window.addEventListener("keydown",   reset);
-    window.addEventListener("mousemove", reset);
+    document.addEventListener("keydown", reset);
+    document.addEventListener("mousemove", reset);
   }
 
-  setCanvas(canvas: HTMLCanvasElement): void {
-    this.canvas = canvas;
-  }
-
-  onStateChange(cb: StateChangeCallback): void {
+  onStateChange(cb: StateCallback): void {
     this.stateCallbacks.push(cb);
   }
 
   getCurrentKanji(): string {
-    return KANJI_CYCLE[this.kanjiIndex];
+    return KANJI_CYCLE[this.kanjiIndex % KANJI_CYCLE.length];
   }
-
-  // ── idle state machine ───────────────────────────────────────────────────────
 
   private resetIdle(): void {
     this.lastInput = Date.now();
     if (this.isIdle) {
-      this.isIdle = false;
       this.stopIdle();
+      this.isIdle = false;
       this.notify(false);
     }
   }
 
   private notify(idle: boolean): void {
-    for (const cb of this.stateCallbacks) cb(idle);
+    const kanji = idle ? this.getCurrentKanji() : undefined;
+    this.stateCallbacks.forEach((cb) => cb(idle, kanji));
   }
-
-  // Called externally each animation frame (or by its own rAF loop)
-  tick(): void {
-    if (!this.isIdle && Date.now() - this.lastInput >= IDLE_THRESHOLD_MS) {
-      this.isIdle = true;
-      this.startIdle();
-      this.notify(true);
-    }
-
-    if (this.isIdle) this.drawScanLine();
-  }
-
-  // ── scan line ────────────────────────────────────────────────────────────────
-
-  private scanY: number = 0;
-  private scanStartTime: number = 0;
-
-  private drawScanLine(): void {
-    if (!this.canvas) return;
-    const ctx = this.canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Use logical dimensions (context is already DPR-scaled)
-    const dpr = window.devicePixelRatio || 1;
-    const logicalWidth  = this.canvas.width / dpr;
-    const logicalHeight = this.canvas.height / dpr;
-    const now    = Date.now();
-    const elapsed = now - this.scanStartTime;
-
-    // Full sweep in 3 s
-    this.scanY = ((elapsed / 3000) % 1) * logicalHeight;
-
-    ctx.fillStyle = "rgba(255,106,0,0.02)";
-    ctx.fillRect(0, this.scanY, logicalWidth, 6);
-  }
-
-  // ── kanji cycling ────────────────────────────────────────────────────────────
 
   private startIdle(): void {
-    this.scanStartTime = Date.now();
+    this.isIdle = true;
+    this.kanjiIndex = 0;
+    this.notify(true);
     this.kanjiInterval = setInterval(() => {
       this.kanjiIndex = (this.kanjiIndex + 1) % KANJI_CYCLE.length;
-      // Notify so status bar can re-render the icon
       this.notify(true);
-    }, 800);
+    }, KANJI_INTERVAL_MS);
   }
 
   private stopIdle(): void {
-    if (this.kanjiInterval !== null) {
+    if (this.kanjiInterval) {
       clearInterval(this.kanjiInterval);
       this.kanjiInterval = null;
     }
   }
 
-  // ── rAF self-drive (optional — caller can call tick() manually instead) ──────
-
+  /** Start the idle checker. Uses setInterval instead of RAF — no animation frames consumed. */
   start(): void {
-    const loop = () => {
-      this.tick();
-      this.rafId = requestAnimationFrame(loop);
-    };
-    this.rafId = requestAnimationFrame(loop);
+    this.checkInterval = setInterval(() => {
+      if (!this.isIdle && Date.now() - this.lastInput >= IDLE_THRESHOLD_MS) {
+        this.startIdle();
+      }
+    }, 1000);
   }
 
   stop(): void {
-    cancelAnimationFrame(this.rafId);
     this.stopIdle();
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
   }
 }

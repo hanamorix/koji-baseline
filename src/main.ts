@@ -52,23 +52,15 @@ container.removeChild(bootCanvas);
 
 export const grid = new TerminalGrid(container);
 
-// ─── Idle animator ────────────────────────────────────────────────────────────
-
-const idleAnimator = new IdleAnimator();
-
-// Feed the terminal canvas to the idle animator once the grid exposes it.
-// TerminalGrid renders to a <canvas> it owns inside `container`.
-const termCanvas = container.querySelector("canvas");
-if (termCanvas) idleAnimator.setCanvas(termCanvas as HTMLCanvasElement);
-
-// Kanji icon — status bar element id: "idle-icon" (added by status-bar if present)
-idleAnimator.onStateChange((idle) => {
-  const iconEl = document.getElementById("idle-icon");
-  if (!iconEl) return;
-  iconEl.textContent = idle ? idleAnimator.getCurrentKanji() : "光";
+// ── Idle animator (kanji cycling only, no canvas) ──────────────────────────
+const idle = new IdleAnimator();
+idle.onStateChange((isIdle, kanji) => {
+  const el = document.getElementById("idle-icon");
+  if (el) {
+    el.textContent = isIdle && kanji ? kanji : "";
+  }
 });
-
-idleAnimator.start();
+idle.start();
 
 // ─── Transition effects ───────────────────────────────────────────────────────
 

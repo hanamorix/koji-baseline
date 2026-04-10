@@ -240,3 +240,48 @@ html, body {
   color: var(--koji-muted);
   font-size: 10px;
 }
+
+/* ── Terminal overlay ────────────────────────────────────────────────────────── */
+
+.terminal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.terminal-overlay.active {
+  pointer-events: auto;
+}
+
+.overlay-message {
+  background: rgba(10, 10, 10, 0.92);
+  border-left: 2px solid var(--koji-dim);
+  padding: 8px 12px;
+  color: var(--koji-warm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 60%;
+  overflow-y: auto;
+  border-radius: 2px;
+}
+
+.overlay-message.error {
+  border-left-color: var(--koji-error);
+  color: var(--koji-error);
+}
+
+.overlay-message.streaming {
+  border-left-color: var(--koji-orange);
+}

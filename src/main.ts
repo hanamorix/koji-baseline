@@ -17,6 +17,7 @@ import { IdleAnimator } from "./ascii/idle";
 import { TransitionEffects } from "./animation/effects";
 import { themeManager } from "./themes/manager";
 import { dispatchCommand } from "./commands/router";
+import { overlay } from "./overlay/overlay";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -86,12 +87,9 @@ if (effectCanvas) {
 
 const llm = new LlmPanel();
 
-// Wire streaming response into the grid renderer (Task 10 hook)
+// Wire streaming response into the DOM overlay (replaces Canvas painting)
 llm.onResponseUpdate((text, done) => {
-  const snap = grid.getLastSnapshot();
-  if (snap) {
-    grid.setLlmResponse(text, done, snap.cursor.row);
-  }
+  overlay.updateStreaming(text, done);
 });
 
 // Check Ollama on startup — update dashboard elements if present
@@ -238,12 +236,13 @@ window.addEventListener("keydown", async (event) => {
         effects?.commandSubmit();
         const result = dispatchCommand(line);
         if (result) {
-          const { output, isError } = await result;
-          const snap = grid.getLastSnapshot();
-          if (snap) {
-            grid.setLlmResponse(output, true, snap.cursor.row);
+          const res = await result;
+          if ("type" in res && res.type === "menu") {
+            // MenuResult — handled by menu component (Task 2)
+            overlay.dismiss();
+          } else {
+            overlay.showMessage(res.output, res.isError);
           }
-          void isError; // isError available for future styling hooks
         }
         currentInput = "";
         return;
@@ -253,6 +252,7 @@ window.addEventListener("keydown", async (event) => {
         // ── LLM query — don't send to PTY ──
         event.preventDefault();
         effects?.commandSubmit();
+        overlay.dismiss(); // clear any previous overlay
         llm.query(line).catch((err) => console.error("llm.query failed:", err));
         currentInput = "";
         return;
@@ -268,6 +268,10 @@ window.addEventListener("keydown", async (event) => {
       currentInput = currentInput.slice(0, -1);
     } else if (key.length === 1) {
       currentInput += key;
+      // Auto-dismiss overlay when user starts typing a new command
+      if (currentInput.length === 1 && overlay.isActive) {
+        overlay.dismiss();
+      }
     }
   }
 

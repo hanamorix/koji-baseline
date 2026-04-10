@@ -1,7 +1,6 @@
 // grid.ts — Canvas 2D terminal grid renderer
 // Paints the full GridSnapshot every frame. Cursor breathes. Wallace amber on.
 // Scrollback fade dims lines above the cursor — atmosphere layer 1.
-// Task 10: Inline LLM response block rendered below the cursor row.
 
 import { applyScrollbackFade } from "./scrollback";
 import { ClickableRegion, findRegionAt } from "./clickable";
@@ -10,12 +9,6 @@ const CELL_WIDTH = 9;
 const CELL_HEIGHT = 18;
 const FONT_SIZE = 14;
 const FONT_FAMILY = "'JetBrains Mono', 'Courier New', monospace";
-
-// LLM response render config
-const LLM_FG = "#cc7a00";
-const LLM_BORDER = "#4a3a1a";
-const LLM_BORDER_WIDTH = 2;
-const LLM_PAD_LEFT = 6; // pixels from left edge (border + gap)
 
 // ─── Types (mirror Rust GridSnapshot) ─────────────────────────────────────────
 
@@ -41,14 +34,6 @@ export interface GridSnapshot {
   cols: number;
 }
 
-// ─── LLM overlay state ────────────────────────────────────────────────────────
-
-interface LlmState {
-  text: string;
-  done: boolean;
-  afterRow: number;
-}
-
 // ─── TerminalGrid ──────────────────────────────────────────────────────────────
 
 export class TerminalGrid {
@@ -58,7 +43,6 @@ export class TerminalGrid {
   private cursorAnimStart: number | null = null;
   private rafHandle = 0;
   private lastSnapshot: GridSnapshot | null = null;
-  private llmState: LlmState | null = null;
   private clickableRegions: ClickableRegion[] = [];
   private hoveredRegion: ClickableRegion | null = null;
 
@@ -102,15 +86,6 @@ export class TerminalGrid {
     }
     this.lastSnapshot = snapshot;
     this.drawGrid(snapshot);
-  }
-
-  /** Called by the LLM panel on every streaming token batch. */
-  setLlmResponse(text: string, done: boolean, afterRow: number): void {
-    this.llmState = { text, done, afterRow };
-    // Redraw immediately so the user sees tokens arriving
-    if (this.lastSnapshot) {
-      this.drawGrid(this.lastSnapshot);
-    }
   }
 
   /** Expose the last snapshot so main.ts can read cursor position. */
@@ -224,56 +199,8 @@ export class TerminalGrid {
       }
     }
 
-    // LLM overlay — rendered after grid cells so it sits on top
-    this.drawLlmResponse();
-
     // Cursor on top of everything
     this.drawCursor(snapshot);
-  }
-
-  /**
-   * Renders the LLM response text below the cursor row with:
-   *   - 2px amber-dark left border
-   *   - Text in amber (#cc7a00)
-   *   - Word-wrapping at canvas width
-   */
-  private drawLlmResponse(): void {
-    if (!this.llmState || !this.lastSnapshot) return;
-    const { text, afterRow } = this.llmState;
-    if (!text) return;
-
-    const { ctx } = this;
-    // Use logical pixel dimensions (CSS size), not physical canvas dimensions
-    const logicalWidth = parseFloat(this.canvas.style.width) || this.canvas.width;
-    const logicalHeight = parseFloat(this.canvas.style.height) || this.canvas.height;
-    const startY = (afterRow + 1) * CELL_HEIGHT;
-
-    // Hard-clip to canvas bottom — don't render off-screen
-    if (startY >= logicalHeight) return;
-
-    const maxWidth = logicalWidth - LLM_PAD_LEFT - 4;
-
-    // Left border
-    ctx.save();
-    ctx.fillStyle = LLM_BORDER;
-    ctx.fillRect(0, startY, LLM_BORDER_WIDTH, logicalHeight - startY);
-
-    // Wrap and render text lines
-    ctx.fillStyle = LLM_FG;
-    ctx.font = `normal normal ${FONT_SIZE}px ${FONT_FAMILY}`;
-    ctx.textBaseline = "top";
-    ctx.globalAlpha = 1.0;
-
-    const lines = wrapText(ctx, text, maxWidth);
-    let y = startY + 2; // 2px padding from border top
-
-    for (const line of lines) {
-      if (y + CELL_HEIGHT > logicalHeight) break; // ran out of canvas
-      ctx.fillText(line, LLM_PAD_LEFT, y);
-      y += CELL_HEIGHT;
-    }
-
-    ctx.restore();
   }
 
   private drawCursor(snapshot: GridSnapshot): void {
@@ -308,39 +235,3 @@ function buildFont(bold: boolean, italic: boolean): string {
   return `${style} ${weight} ${FONT_SIZE}px ${FONT_FAMILY}`;
 }
 
-/**
- * Splits `text` into lines that fit within `maxWidth` pixels.
- * Honours existing newlines first, then wraps long lines by word.
- */
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-): string[] {
-  const result: string[] = [];
-
-  for (const paragraph of text.split("\n")) {
-    if (paragraph === "") {
-      result.push("");
-      continue;
-    }
-
-    const words = paragraph.split(" ");
-    let line = "";
-
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (ctx.measureText(candidate).width <= maxWidth) {
-        line = candidate;
-      } else {
-        if (line) result.push(line);
-        // If a single word is wider than maxWidth, push it anyway
-        line = word;
-      }
-    }
-
-    if (line) result.push(line);
-  }
-
-  return result;
-}

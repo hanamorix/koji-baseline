@@ -196,4 +196,55 @@ impl OllamaClient {
     pub fn set_model(&mut self, model: String) {
         self.current_model = model;
     }
+
+    /// GET /api/tags — return a list of model names available in Ollama.
+    pub async fn list_models(&self) -> Result<Vec<String>, String> {
+        let url = format!("{}/api/tags", self.base_url);
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("Ollama request failed: {e}"))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("Ollama returned HTTP {}", resp.status()));
+        }
+
+        let body: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| format!("JSON parse error: {e}"))?;
+
+        let models = body["models"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|m| m["name"].as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(models)
+    }
+
+    /// POST /api/pull — pull a model by name. Blocks until done (stream:false).
+    pub async fn pull_model(&self, model: String) -> Result<(), String> {
+        let url = format!("{}/api/pull", self.base_url);
+        let body = serde_json::json!({ "name": model, "stream": false });
+
+        let resp = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Ollama pull request failed: {e}"))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("Ollama pull returned HTTP {}", resp.status()));
+        }
+
+        Ok(())
+    }
 }

@@ -165,6 +165,20 @@ async fn check_ollama(state: State<'_, OllamaState>) -> Result<ollama::OllamaSta
     Ok(client.check_status().await)
 }
 
+/// List all models available in Ollama (/api/tags).
+#[tauri::command]
+async fn ollama_list_models(state: State<'_, OllamaState>) -> Result<Vec<String>, String> {
+    let client = state.0.lock().await;
+    client.list_models().await
+}
+
+/// Pull a model from the Ollama registry (/api/pull, stream:false).
+#[tauri::command]
+async fn ollama_pull_model(model: String, state: State<'_, OllamaState>) -> Result<(), String> {
+    let client = state.0.lock().await;
+    client.pull_model(model).await
+}
+
 // ─── Theme Commands ───────────────────────────────────────────────────────────
 
 /// Update the terminal engine's colour mapping at runtime.
@@ -247,6 +261,8 @@ pub fn run() {
             llm_query,
             switch_model,
             check_ollama,
+            ollama_list_models,
+            ollama_pull_model,
             set_theme_colors,
             save_config,
             load_config,

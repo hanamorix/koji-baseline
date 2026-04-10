@@ -15,6 +15,7 @@ import { BootSequence } from "./ascii/boot";
 import { IdleAnimator } from "./ascii/idle";
 import { TransitionEffects } from "./animation/effects";
 import { themeManager } from "./themes/manager";
+import { dispatchCommand } from "./commands/router";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -174,6 +175,23 @@ window.addEventListener("keydown", async (event) => {
   if (!ctrlKey) {
     if (key === "Enter") {
       const line = currentInput.trim();
+
+      if (line.startsWith("/")) {
+        // ── Slash command — intercept before PTY ──
+        event.preventDefault();
+        effects?.commandSubmit();
+        const result = dispatchCommand(line);
+        if (result) {
+          const { output, isError } = await result;
+          const snap = grid.getLastSnapshot();
+          if (snap) {
+            grid.setLlmResponse(output, true, snap.cursor.row);
+          }
+          void isError; // isError available for future styling hooks
+        }
+        currentInput = "";
+        return;
+      }
 
       if (line.startsWith(">>")) {
         // ── LLM query — don't send to PTY ──

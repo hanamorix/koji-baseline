@@ -222,6 +222,17 @@ let currentInput = "";
 window.addEventListener("keydown", async (event) => {
   const { key, ctrlKey, metaKey } = event;
 
+  // ── Skip if an input element has focus (agent pane, menu filter, etc.) ──
+  const active = document.activeElement;
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+    // Only intercept Escape (to close agent pane) — let everything else flow to the input
+    if (key === "Escape" && agentPane.isOpen) {
+      event.preventDefault();
+      agentPane.close();
+    }
+    return;
+  }
+
   // ── Cmd+V — paste from clipboard ─────────────────────────────────────────
   if (metaKey && key === "v") {
     event.preventDefault();

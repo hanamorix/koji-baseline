@@ -1,19 +1,18 @@
 // main.ts — Koji terminal frontend
-// PTY → engine → event → Canvas. Keyboard → ANSI → write_to_pty.
+// PTY → engine → event → DOM grid. Keyboard → ANSI → write_to_pty.
 // Task 9:  >> prefix routes to Ollama; commandHistory tracks shell I/O for context.
 // Task 11: ASCII boot sequence.
 // Task 12: Idle animations + transition effects.
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { TerminalGrid, GridSnapshot } from "./terminal/grid";
-import { detectClickableRegions, findRegionAt } from "./terminal/clickable";
+import { DOMGrid } from "./terminal/dom-grid";
+import type { GridSnapshot } from "./terminal/dom-grid";
 import { initDashboard } from "./dashboard/status-bar";
 import { LlmPanel } from "./llm/panel";
 import { commandHistory } from "./llm/context";
 import { BootSequence } from "./ascii/boot";
 import { IdleAnimator } from "./ascii/idle";
-import { TransitionEffects } from "./animation/effects";
 import { themeManager } from "./themes/manager";
 import { dispatchCommand } from "./commands/router";
 import type { CommandResult } from "./commands/router";
@@ -50,7 +49,7 @@ container.removeChild(bootCanvas);
 
 // ─── Terminal grid ────────────────────────────────────────────────────────────
 
-export const grid = new TerminalGrid(container);
+export const domGrid = new DOMGrid(container);
 
 // ── Idle animator (kanji cycling only, no canvas) ──────────────────────────
 const idle = new IdleAnimator();
@@ -61,14 +60,6 @@ idle.onStateChange((isIdle, kanji) => {
   }
 });
 idle.start();
-
-// ─── Transition effects ───────────────────────────────────────────────────────
-
-let effects: TransitionEffects | null = null;
-const effectCanvas = container.querySelector("canvas");
-if (effectCanvas) {
-  effects = new TransitionEffects(effectCanvas as HTMLCanvasElement);
-}
 
 // ─── LLM setup ───────────────────────────────────────────────────────────────
 
@@ -101,41 +92,33 @@ invoke<{ model: string; state: string }>("check_ollama")
   llmOnboarding.run().catch(console.error);
 };
 
-// ─── CWD tracking — updated by the same "cwd-changed" event the status bar uses
-
-let currentCwd = "~";
-listen<{ path: string }>("cwd-changed", (event) => {
-  currentCwd = event.payload.path;
-}).catch((err) => {
-  console.warn("cwd-changed (main) listener failed:", err);
-});
+// ─── CWD tracking — currently unused (clickable regions removed), will return
+// let currentCwd = "~";
+// listen<{ path: string }>("cwd-changed", (event) => {
+//   currentCwd = event.payload.path;
+// }).catch((err) => {
+//   console.warn("cwd-changed (main) listener failed:", err);
+// });
 
 // ─── Theme applied — force grid redraw so colour changes take effect immediately
 
 listen("theme-applied", () => {
-  grid.forceRedraw();
+  const snap = domGrid.getLastSnapshot();
+  if (snap) domGrid.render(snap);
 }).catch((err) => {
   console.warn("theme-applied listener failed:", err);
 });
 
 // ─── Terminal I/O ─────────────────────────────────────────────────────────────
 
-let clickableTimer = 0;
-
 listen<GridSnapshot>("terminal-output", (event) => {
-  grid.render(event.payload);
-
-  // Debounce region detection — scan 200 ms after the last output burst
-  clearTimeout(clickableTimer);
-  clickableTimer = window.setTimeout(async () => {
-    const regions = await detectClickableRegions(event.payload.cells, currentCwd);
-    grid.setClickableRegions(regions);
-  }, 200);
+  domGrid.render(event.payload);
+}).catch((err) => {
+  console.warn("terminal-output listener failed:", err);
 });
 
 // Dynamic initial size based on container dimensions
-const initCols = Math.max(1, Math.floor(container.clientWidth / 9));
-const initRows = Math.max(1, Math.floor(container.clientHeight / 18));
+const { rows: initRows, cols: initCols } = domGrid.measureGrid();
 invoke("init_terminal", { rows: initRows, cols: initCols }).catch((err) => {
   console.error("init_terminal failed:", err);
 });
@@ -143,58 +126,14 @@ invoke("init_terminal", { rows: initRows, cols: initCols }).catch((err) => {
 // ─── Resize observer — grid adapts to window ─────────────────────────────────
 
 let resizeTimer: number | null = null;
-const resizeObserver = new ResizeObserver((entries) => {
+new ResizeObserver(() => {
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => {
-    for (const entry of entries) {
-      const { width, height } = entry.contentRect;
-      const cols = Math.floor(width / 9);   // CELL_WIDTH  = 9px
-      const rows = Math.floor(height / 18); // CELL_HEIGHT = 18px
-      if (cols > 0 && rows > 0) {
-        grid.resize(rows, cols);
-        invoke("resize_terminal", { rows, cols }).catch(console.warn);
-      }
-    }
+    const { rows, cols } = domGrid.measureGrid();
+    domGrid.resize(rows, cols);
+    invoke("resize_terminal", { rows, cols }).catch(console.warn);
   }, 50);
-});
-resizeObserver.observe(container);
-
-// ─── Canvas mouse interaction — hover highlights + click-to-open ─────────────
-
-const terminalCanvas = grid.getCanvas();
-
-terminalCanvas.addEventListener("mousemove", (event: MouseEvent) => {
-  const { row, col } = grid.getCellFromClick(event);
-  const region = findRegionAt(grid.getClickableRegions(), row, col);
-  grid.setHoveredRegion(region ?? null);
-});
-
-terminalCanvas.addEventListener("mouseleave", () => {
-  grid.setHoveredRegion(null);
-});
-
-terminalCanvas.addEventListener("click", async (event: MouseEvent) => {
-  const { row, col } = grid.getCellFromClick(event);
-  const region = findRegionAt(grid.getClickableRegions(), row, col);
-  if (!region) return;
-
-  if (region.type === "url") {
-    invoke("open_url", { url: region.value }).catch((err) => {
-      console.error("open_url failed:", err);
-    });
-  } else if (region.type === "directory") {
-    // Navigate shell into directory — send as if typed at the prompt
-    const cmd = `cd ${region.value}\r`;
-    const bytes = Array.from(new TextEncoder().encode(cmd));
-    invoke("write_to_pty", { data: bytes }).catch((err) => {
-      console.error("cd write_to_pty failed:", err);
-    });
-  } else if (region.type === "file") {
-    invoke("open_file", { path: region.value }).catch((err) => {
-      console.error("open_file failed:", err);
-    });
-  }
-});
+}).observe(container);
 
 // ─── Keyboard input ───────────────────────────────────────────────────────────
 
@@ -251,7 +190,6 @@ window.addEventListener("keydown", async (event) => {
       if (line.startsWith("/")) {
         // ── Slash command — intercept before PTY ──
         event.preventDefault();
-        effects?.commandSubmit();
         const result = dispatchCommand(line);
         if (result) {
           const res = await result;
@@ -269,7 +207,6 @@ window.addEventListener("keydown", async (event) => {
       if (line.startsWith(">>")) {
         // ── LLM query — don't send to PTY ──
         event.preventDefault();
-        effects?.commandSubmit();
         overlay.dismiss(); // clear any previous overlay
 
         // Auto-trigger onboarding if no model is configured yet
@@ -296,7 +233,6 @@ window.addEventListener("keydown", async (event) => {
       // Regular shell command — record it for context, fire submit effect
       if (line.length > 0) {
         commandHistory.addCommand(line);
-        effects?.commandSubmit();
       }
       currentInput = "";
     } else if (key === "Backspace") {

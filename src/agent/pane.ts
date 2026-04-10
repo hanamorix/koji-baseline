@@ -182,15 +182,11 @@ export class AgentPane {
     }
 
     // Resize terminal back to full width
-    const canvas = container.querySelector("canvas");
-    if (canvas) {
-      import("../main").then(({ grid }) => {
-        const cols = Math.max(1, Math.floor(container.clientWidth / 9));
-        const rows = Math.max(1, Math.floor(container.clientHeight / 18));
-        grid.resize(rows, cols);
-        invoke("resize_terminal", { rows, cols }).catch(console.warn);
-      }).catch(console.warn);
-    }
+    import("../main").then(({ domGrid }) => {
+      const { rows, cols } = domGrid.measureGrid();
+      domGrid.resize(rows, cols);
+      invoke("resize_terminal", { rows, cols }).catch(console.warn);
+    }).catch(console.warn);
 
     // Remove capture handler
     if (this.captureHandler) {

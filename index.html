@@ -3,14 +3,43 @@
 <head>
   <meta charset="UTF-8" />
   <title>Kōji Baseline</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; }
-    #terminal-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-  </style>
+  <link rel="stylesheet" href="/src/styles/wallace.css" />
 </head>
 <body>
-  <div id="terminal-container"></div>
+  <div id="app">
+
+    <!-- ── Status bar ─────────────────────────────────────────── -->
+    <div class="dashboard-top">
+      <span class="label-icon">◉</span>
+      CPU <span class="value" id="cpu-value">--%</span>
+      <span class="separator">│</span>
+      MEM <span class="value" id="mem-value">--G</span>
+      <span class="separator">│</span>
+      <span class="value" id="model-name">--</span>
+      <span class="model-ready" id="model-status">●</span>
+      <span class="separator">│</span>
+      <span class="era-clock" id="era-clock">--</span>
+    </div>
+
+    <!-- ── Waveform top ───────────────────────────────────────── -->
+    <div class="waveform" id="waveform-top">▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁</div>
+
+    <!-- ── Terminal canvas ────────────────────────────────────── -->
+    <div class="terminal-viewport" id="terminal-container"></div>
+
+    <!-- ── Waveform bottom ────────────────────────────────────── -->
+    <div class="waveform" id="waveform-bottom">▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁</div>
+
+    <!-- ── Context bar ────────────────────────────────────────── -->
+    <div class="dashboard-bottom">
+      <span style="color: var(--koji-dim);">▸</span>
+      <span class="path" id="cwd-path">~/</span>
+      <span style="color: var(--koji-dim);">on</span>
+      <span class="branch" id="git-branch">--</span>
+      <span class="git-status" id="git-status"></span>
+    </div>
+
+  </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

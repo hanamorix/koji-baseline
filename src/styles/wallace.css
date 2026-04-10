@@ -1,0 +1,221 @@
+/* wallace.css — Kōji Baseline amber aesthetic layer
+   The Wallace theme: void black, amber glow, signal from noise. */
+
+/* ─── Palette ──────────────────────────────────────────────────────────────── */
+
+:root {
+  --koji-void:    #0a0a0a;
+  --koji-bright:  #ff8c00;
+  --koji-warm:    #cc7a00;
+  --koji-muted:   #996b00;
+  --koji-faded:   #5a4a1a;
+  --koji-deep:    #3a2a10;
+  --koji-dim:     #4a3a1a;
+  --koji-orange:  #ff6a00;
+  --koji-error:   #ff4500;
+  --koji-success: #3a6a3a;
+  --koji-glow:    rgba(255, 106, 0, 0.3);
+}
+
+/* ─── Reset ─────────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: var(--koji-void);
+  overflow: hidden;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  color: var(--koji-warm);
+}
+
+/* ─── App shell ──────────────────────────────────────────────────────────────── */
+
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--koji-void);
+  position: relative;
+}
+
+/* Top edge gradient line */
+#app::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 106, 0, 0.3) 30%,
+    rgba(255, 106, 0, 0.3) 70%,
+    transparent 100%
+  );
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Bottom edge gradient line */
+#app::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 106, 0, 0.3) 30%,
+    rgba(255, 106, 0, 0.3) 70%,
+    transparent 100%
+  );
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ─── Dashboard top ──────────────────────────────────────────────────────────── */
+
+.dashboard-top {
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  background: var(--koji-void);
+  border-bottom: 1px solid var(--koji-deep);
+  color: var(--koji-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  user-select: none;
+}
+
+.dashboard-top .label-icon {
+  color: var(--koji-orange);
+  font-size: 13px;
+  margin-right: 4px;
+  text-shadow: 0 0 6px var(--koji-glow);
+}
+
+.dashboard-top .value {
+  color: var(--koji-bright);
+  font-weight: bold;
+  min-width: 40px;
+  text-shadow: 0 0 4px var(--koji-glow);
+}
+
+.dashboard-top .separator {
+  color: var(--koji-faded);
+  margin: 0 4px;
+}
+
+.dashboard-top .model-ready {
+  font-size: 9px;
+  color: var(--koji-success);
+  margin-left: 2px;
+}
+
+.dashboard-top .era-clock {
+  margin-left: auto;
+  color: var(--koji-muted);
+  letter-spacing: 0.05em;
+  font-size: 11px;
+}
+
+/* ─── Waveform divider ───────────────────────────────────────────────────────── */
+
+.waveform {
+  height: 12px;
+  min-height: 12px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: var(--koji-void);
+  color: var(--koji-faded);
+  font-size: 10px;
+  letter-spacing: -0.5px;
+  overflow: hidden;
+  white-space: nowrap;
+  user-select: none;
+  border-top: 1px solid var(--koji-deep);
+  border-bottom: 1px solid var(--koji-deep);
+}
+
+/* ─── Terminal viewport ──────────────────────────────────────────────────────── */
+
+.terminal-viewport {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--koji-void);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Subtle ambient glow behind the canvas */
+.terminal-viewport::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 106, 0, 0.03) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.terminal-viewport canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+  image-rendering: pixelated;
+}
+
+/* ─── Dashboard bottom ───────────────────────────────────────────────────────── */
+
+.dashboard-bottom {
+  height: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  background: var(--koji-void);
+  border-top: 1px solid var(--koji-deep);
+  color: var(--koji-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  user-select: none;
+}
+
+.dashboard-bottom .path {
+  color: var(--koji-warm);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-bottom .branch {
+  color: var(--koji-orange);
+}
+
+.dashboard-bottom .git-status {
+  color: var(--koji-muted);
+  font-size: 10px;
+}

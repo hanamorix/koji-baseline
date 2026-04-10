@@ -234,16 +234,11 @@ window.addEventListener("keydown", async (event) => {
     event.preventDefault();
     const suggestion = autocomplete.accept();
     if (suggestion) {
-      if (suggestion.startsWith("/") || suggestion.startsWith(">>")) {
-        // Slash command or LLM prefix — just replace currentInput
-        currentInput = suggestion;
-      } else {
-        // Shell command — write the remaining chars to PTY
-        const remaining = suggestion.slice(currentInput.length);
-        currentInput = suggestion;
-        const bytes = Array.from(new TextEncoder().encode(remaining));
-        invoke("write_to_pty", { data: bytes }).catch(console.error);
-      }
+      const remaining = suggestion.slice(currentInput.length);
+      currentInput = suggestion;
+      // Write remaining chars to PTY so they appear in terminal
+      const bytes = Array.from(new TextEncoder().encode(remaining));
+      invoke("write_to_pty", { data: bytes }).catch(console.error);
     }
     return;
   }
@@ -257,6 +252,8 @@ window.addEventListener("keydown", async (event) => {
       if (line.startsWith("/")) {
         // ── Slash command — intercept before PTY ──
         event.preventDefault();
+        // Clear the shell's input buffer (Ctrl+U = kill line, Ctrl+C = new prompt)
+        invoke("write_to_pty", { data: [21, 3] }).catch(console.error); // \x15 \x03
         effects.commandSubmit();
         const result = dispatchCommand(line);
         if (result) {
@@ -273,9 +270,11 @@ window.addEventListener("keydown", async (event) => {
       }
 
       if (line.startsWith(">>")) {
-        // ── LLM query — don't send to PTY ──
+        // ── LLM query — intercept before PTY ──
         event.preventDefault();
-        overlay.dismiss(); // clear any previous overlay
+        // Clear the shell's input buffer
+        invoke("write_to_pty", { data: [21, 3] }).catch(console.error); // \x15 \x03
+        overlay.dismiss();
 
         // Auto-trigger onboarding if no model is configured yet
         const activeModel = await invoke<string>("load_config", { key: "activeModel" }).catch(() => "");
@@ -318,11 +317,6 @@ window.addEventListener("keydown", async (event) => {
 
     // Update autocomplete ghost text
     autocomplete.update(currentInput);
-
-    // If we're composing a slash command or LLM query, don't send to PTY
-    if (currentInput.startsWith("/") || currentInput.startsWith(">>")) {
-      return;
-    }
   }
 
   // Scroll shortcuts (Shift + navigation keys)

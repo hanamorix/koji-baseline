@@ -565,55 +565,7 @@ html, body {
   background: rgba(255, 140, 0, 0.25);
 }
 
-/* ── Command input bar (visible when typing / or >> commands) ────────────── */
-
-.command-input-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 6;
-  background: rgba(10, 10, 10, 0.95);
-  border-top: 1px solid var(--koji-dim);
-  padding: 4px 12px;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: 1.3;
-  display: none;
-}
-
-.command-input-bar.active {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.command-input-bar .input-prefix {
-  color: var(--koji-orange);
-  font-weight: bold;
-  flex-shrink: 0;
-}
-
-.command-input-bar .input-text {
-  color: var(--koji-warm);
-}
-
-.command-input-bar .input-ghost {
-  color: var(--koji-faded);
-  opacity: 0.5;
-}
-
-.command-input-bar .input-cursor {
-  display: inline-block;
-  width: 3px;
-  height: 1em;
-  background: var(--koji-bright);
-  animation: cursor-blink 1s step-end infinite;
-  vertical-align: text-bottom;
-  margin-left: 1px;
-}
-
-/* ── Inline ghost text (shell history suggestions at cursor) ─────────────── */
+/* ── Inline ghost text (autocomplete suggestions at cursor) ──────────────── */
 
 .inline-ghost {
   color: var(--koji-faded);

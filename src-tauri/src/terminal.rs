@@ -1,5 +1,5 @@
 // terminal.rs — Terminal Engine: VTE parser + grid snapshot → JSON-serializable state
-// alacritty_terminal wraps the hard bits; we just dress the output in Wallace amber and ship it.
+// alacritty_terminal wraps the hard bits; we dress the output in whatever theme is active.
 
 use alacritty_terminal::Term;
 use alacritty_terminal::event::VoidListener;
@@ -9,6 +9,7 @@ use alacritty_terminal::term::test::TermSize;
 use alacritty_terminal::vte::ansi::{Color, NamedColor, Processor, Rgb};
 use alacritty_terminal::term::cell::Flags;
 use serde::Serialize;
+use std::collections::HashMap;
 
 // ─── Serializable output types ────────────────────────────────────────────────
 
@@ -37,10 +38,10 @@ pub struct GridSnapshot {
     pub cols: usize,
 }
 
-// ─── Wallace amber palette ─────────────────────────────────────────────────
-// Everything through amber glass. Ship it.
+// ─── Named colour palette ──────────────────────────────────────────────────
+// Default: Wallace amber. Overridden at runtime by set_theme_colors().
 
-fn named_to_rgb(name: NamedColor) -> [u8; 3] {
+fn named_to_rgb_default(name: NamedColor) -> [u8; 3] {
     match name {
         NamedColor::Black | NamedColor::DimBlack => [10, 10, 10],
         NamedColor::Red | NamedColor::BrightRed | NamedColor::DimRed => [255, 69, 0],
@@ -65,6 +66,25 @@ fn named_to_rgb(name: NamedColor) -> [u8; 3] {
         NamedColor::Background => [10, 10, 10],
         NamedColor::Cursor => [255, 140, 0],
     }
+}
+
+/// Resolve a NamedColor against a theme override map, falling back to Wallace defaults.
+fn named_to_rgb(name: NamedColor, overrides: &HashMap<String, [u8; 3]>) -> [u8; 3] {
+    // Map NamedColor variants to the canonical key names used in TerminalColors
+    let key: &str = match name {
+        NamedColor::Black | NamedColor::DimBlack => "black",
+        NamedColor::Red | NamedColor::BrightRed | NamedColor::DimRed => "red",
+        NamedColor::Green | NamedColor::BrightGreen | NamedColor::DimGreen => "green",
+        NamedColor::Yellow | NamedColor::BrightYellow | NamedColor::DimYellow | NamedColor::BrightBlack => "yellow",
+        NamedColor::Blue | NamedColor::BrightBlue | NamedColor::DimBlue => "blue",
+        NamedColor::Magenta | NamedColor::BrightMagenta | NamedColor::DimMagenta => "magenta",
+        NamedColor::Cyan | NamedColor::BrightCyan | NamedColor::DimCyan => "cyan",
+        NamedColor::White | NamedColor::BrightWhite | NamedColor::DimWhite => "white",
+        NamedColor::Foreground | NamedColor::BrightForeground | NamedColor::DimForeground => "foreground",
+        NamedColor::Background => "background",
+        NamedColor::Cursor => "cursor",
+    };
+    overrides.get(key).copied().unwrap_or_else(|| named_to_rgb_default(name))
 }
 
 /// Map a u8 index from the xterm-256 palette to an RGB triple.
@@ -107,9 +127,9 @@ fn indexed_to_rgb(idx: u8) -> [u8; 3] {
 }
 
 /// Resolve any alacritty Color variant to a concrete RGB triple.
-pub fn color_to_rgb(color: Color) -> [u8; 3] {
+pub fn color_to_rgb(color: Color, overrides: &HashMap<String, [u8; 3]>) -> [u8; 3] {
     match color {
-        Color::Named(name) => named_to_rgb(name),
+        Color::Named(name) => named_to_rgb(name, overrides),
         Color::Spec(Rgb { r, g, b }) => [r, g, b],
         Color::Indexed(idx) => indexed_to_rgb(idx),
     }
@@ -117,7 +137,10 @@ pub fn color_to_rgb(color: Color) -> [u8; 3] {
 
 // ─── cell_to_render ───────────────────────────────────────────────────────────
 
-pub fn cell_to_render(cell: &alacritty_terminal::term::cell::Cell) -> RenderCell {
+pub fn cell_to_render(
+    cell: &alacritty_terminal::term::cell::Cell,
+    overrides: &HashMap<String, [u8; 3]>,
+) -> RenderCell {
     let bold = cell.flags.contains(Flags::BOLD);
     let italic = cell.flags.contains(Flags::ITALIC);
     let underline = cell.flags.contains(Flags::UNDERLINE);
@@ -132,8 +155,8 @@ pub fn cell_to_render(cell: &alacritty_terminal::term::cell::Cell) -> RenderCell
 
     RenderCell {
         character: cell.c.to_string(),
-        fg: color_to_rgb(fg_color),
-        bg: color_to_rgb(bg_color),
+        fg: color_to_rgb(fg_color, overrides),
+        bg: color_to_rgb(bg_color, overrides),
         bold,
         italic,
         underline,
@@ -149,6 +172,9 @@ pub struct TerminalEngine {
     parser: Processor,
     rows: usize,
     cols: usize,
+    /// Runtime theme overrides — maps colour key (e.g. "red") → RGB triple.
+    /// Empty = use Wallace defaults. Populated by set_theme_colors().
+    pub color_overrides: HashMap<String, [u8; 3]>,
 }
 
 impl TerminalEngine {
@@ -158,7 +184,26 @@ impl TerminalEngine {
         let term = Term::new(config, &size, VoidListener);
         let parser = Processor::new();
 
-        Self { term, parser, rows, cols }
+        Self { term, parser, rows, cols, color_overrides: HashMap::new() }
+    }
+
+    /// Apply a theme colour map from a JSON value (object of key → [r, g, b]).
+    /// Keys match TerminalColors: black, red, green, yellow, blue, magenta, cyan,
+    /// white, foreground, background, cursor.
+    pub fn set_theme_colors(&mut self, colors: &serde_json::Value) {
+        self.color_overrides.clear();
+        if let Some(map) = colors.as_object() {
+            for (key, val) in map {
+                if let Some(arr) = val.as_array() {
+                    if arr.len() == 3 {
+                        let r = arr[0].as_u64().unwrap_or(0) as u8;
+                        let g = arr[1].as_u64().unwrap_or(0) as u8;
+                        let b = arr[2].as_u64().unwrap_or(0) as u8;
+                        self.color_overrides.insert(key.clone(), [r, g, b]);
+                    }
+                }
+            }
+        }
     }
 
     /// Push raw PTY bytes through the VTE parser into the terminal state machine.
@@ -182,7 +227,7 @@ impl TerminalEngine {
             for col_idx in 0..self.cols {
                 let col = Column(col_idx);
                 let cell = &grid[line][col];
-                row.push(cell_to_render(cell));
+                row.push(cell_to_render(cell, &self.color_overrides));
             }
 
             cells.push(row);

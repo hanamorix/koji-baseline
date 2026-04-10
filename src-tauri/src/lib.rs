@@ -165,6 +165,71 @@ async fn check_ollama(state: State<'_, OllamaState>) -> Result<ollama::OllamaSta
     Ok(client.check_status().await)
 }
 
+// ─── Theme Commands ───────────────────────────────────────────────────────────
+
+/// Update the terminal engine's colour mapping at runtime.
+/// `colors` is a JSON object of { "black": [r,g,b], "red": [r,g,b], … }
+#[tauri::command]
+fn set_theme_colors(
+    colors: serde_json::Value,
+    engine_state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let mut lock = engine_state.0.lock().unwrap();
+    if let Some(ref mut eng) = *lock {
+        eng.set_theme_colors(&colors);
+    }
+    Ok(())
+}
+
+/// Config file path: ~/.koji-baseline/config.json
+fn config_path() -> std::path::PathBuf {
+    let mut p = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    p.push(".koji-baseline");
+    p.push("config.json");
+    p
+}
+
+/// Persist a key/value string pair to ~/.koji-baseline/config.json.
+#[tauri::command]
+fn save_config(key: String, value: String) -> Result<(), String> {
+    let path = config_path();
+    // Create parent dir if needed
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("mkdir failed: {e}"))?;
+    }
+
+    // Read existing config or start fresh
+    let mut map: serde_json::Map<String, serde_json::Value> = if path.exists() {
+        let raw = std::fs::read_to_string(&path).unwrap_or_default();
+        serde_json::from_str(&raw).unwrap_or_default()
+    } else {
+        serde_json::Map::new()
+    };
+
+    map.insert(key, serde_json::Value::String(value));
+    let out = serde_json::to_string_pretty(&serde_json::Value::Object(map))
+        .map_err(|e| format!("JSON serialise failed: {e}"))?;
+    std::fs::write(&path, out).map_err(|e| format!("Write failed: {e}"))?;
+    Ok(())
+}
+
+/// Load a value from ~/.koji-baseline/config.json by key.
+/// Returns empty string if the key or file doesn't exist.
+#[tauri::command]
+fn load_config(key: String) -> String {
+    let path = config_path();
+    if !path.exists() {
+        return String::new();
+    }
+    let raw = std::fs::read_to_string(&path).unwrap_or_default();
+    let map: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(&raw).unwrap_or_default();
+    map.get(&key)
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
 // ─── App bootstrap ────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -182,6 +247,9 @@ pub fn run() {
             llm_query,
             switch_model,
             check_ollama,
+            set_theme_colors,
+            save_config,
+            load_config,
         ])
         .setup(|app| {
             monitor::start_monitor(app.handle().clone());

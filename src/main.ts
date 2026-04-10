@@ -14,8 +14,12 @@ import { commandHistory } from "./llm/context";
 import { BootSequence } from "./ascii/boot";
 import { IdleAnimator } from "./ascii/idle";
 import { TransitionEffects } from "./animation/effects";
+import { themeManager } from "./themes/manager";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
+
+// Load saved theme before anything renders — colours need to be right on first paint.
+await themeManager.loadSaved();
 
 initDashboard();
 

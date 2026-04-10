@@ -9,7 +9,6 @@ import { listen } from "@tauri-apps/api/event";
 import { TerminalGrid, GridSnapshot } from "./terminal/grid";
 import { detectClickableRegions, findRegionAt } from "./terminal/clickable";
 import { initDashboard } from "./dashboard/status-bar";
-import { WaveformAnimator } from "./animation/waveform";
 import { LlmPanel } from "./llm/panel";
 import { commandHistory } from "./llm/context";
 import { BootSequence } from "./ascii/boot";
@@ -30,15 +29,6 @@ import { llmOnboarding } from "./llm/onboarding";
 await themeManager.loadSaved();
 
 initDashboard();
-
-const waveform = new WaveformAnimator("waveform-top", "waveform-bottom");
-waveform.start();
-
-listen<{ cpu_percent: number }>("system-stats", (event) => {
-  waveform.setCpuPercent(event.payload.cpu_percent);
-}).catch((err) => {
-  console.warn("waveform system-stats listener failed:", err);
-});
 
 const container = document.getElementById("terminal-container");
 if (!container) throw new Error("#terminal-container not found");

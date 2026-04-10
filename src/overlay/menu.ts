@@ -128,7 +128,17 @@ export class InteractiveMenu {
         this.close();
         break;
 
+      case " ":
+        // Space closes the menu (like Escape)
+        e.preventDefault();
+        e.stopPropagation();
+        if (this.onCancel) this.onCancel();
+        this.close();
+        break;
+
       default:
+        // Block ALL keys from reaching main.ts while menu is open
+        e.stopPropagation();
         // Let typing flow into filter input — it's focused
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
           // The input handles it naturally; re-filter on next tick

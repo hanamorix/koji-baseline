@@ -551,8 +551,8 @@ html, body {
 }
 
 @keyframes cursor-blink {
-  0%, 100% { border-left: 2px solid var(--koji-bright); }
-  50% { border-left: 2px solid transparent; }
+  0%, 100% { border-left: 3px solid var(--koji-bright); }
+  50% { border-left: 3px solid transparent; }
 }
 
 /* Selection highlight */

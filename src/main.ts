@@ -282,6 +282,11 @@ window.addEventListener("keydown", async (event) => {
         overlay.dismiss();
       }
     }
+
+    // If we're composing a slash command or LLM query, don't send to PTY
+    if (currentInput.startsWith("/") || currentInput.startsWith(">>")) {
+      return;
+    }
   }
 
   // Scroll shortcuts (Shift + navigation keys)

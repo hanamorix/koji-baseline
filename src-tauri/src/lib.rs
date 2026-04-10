@@ -134,6 +134,7 @@ fn resize_terminal(
 async fn llm_query(
     prompt: String,
     context: Vec<String>,
+    tools: Option<Vec<serde_json::Value>>,
     app: tauri::AppHandle,
     state: State<'_, OllamaState>,
 ) -> Result<(), String> {
@@ -142,16 +143,20 @@ async fn llm_query(
         .map(|c| ollama::ChatMessage {
             role: "user".to_string(),
             content: c,
+            tool_calls: None,
+            tool_call_id: None,
         })
         .collect();
 
     messages.push(ollama::ChatMessage {
         role: "user".to_string(),
         content: prompt,
+        tool_calls: None,
+        tool_call_id: None,
     });
 
     let client = state.0.lock().await;
-    client.chat_stream(messages, &app).await
+    client.chat_stream(messages, tools, &app).await
 }
 
 /// Hot-swap the active model without restarting.

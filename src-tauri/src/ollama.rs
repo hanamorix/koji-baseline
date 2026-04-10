@@ -7,16 +7,36 @@ use tauri::{AppHandle, Emitter};
 
 // ─── Public types (cross the IPC boundary) ────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCallMsg>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallMsg {
+    pub id: Option<String>,
+    #[serde(rename = "type")]
+    pub call_type: Option<String>,
+    pub function: ToolCallFunction,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallFunction {
+    pub name: String,
+    pub arguments: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LlmChunk {
     pub content: String,
     pub done: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCallMsg>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -32,6 +52,8 @@ struct ChatRequest {
     model: String,
     messages: Vec<ChatMessage>,
     stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<serde_json::Value>>,
 }
 
 #[derive(Deserialize)]
@@ -42,7 +64,10 @@ struct ChatResponseChunk {
 
 #[derive(Deserialize)]
 struct ChunkMessage {
+    #[serde(default)]
     content: String,
+    #[serde(default)]
+    tool_calls: Option<Vec<ToolCallMsg>>,
 }
 
 // ─── OllamaClient ─────────────────────────────────────────────────────────────
@@ -82,6 +107,7 @@ impl OllamaClient {
     pub async fn chat_stream(
         &self,
         messages: Vec<ChatMessage>,
+        tools: Option<Vec<serde_json::Value>>,
         app: &AppHandle,
     ) -> Result<(), String> {
         if self.current_model.is_empty() {
@@ -94,6 +120,7 @@ impl OllamaClient {
             model: self.current_model.clone(),
             messages,
             stream: true,
+            tools,
         };
 
         // Signal generating state
@@ -139,16 +166,19 @@ impl OllamaClient {
                     let trimmed = line_buf.trim();
                     if !trimmed.is_empty() {
                         if let Ok(parsed) = serde_json::from_str::<ChatResponseChunk>(trimmed) {
-                            let content = parsed
-                                .message
-                                .map(|m| m.content)
+                            let content = parsed.message.as_ref()
+                                .map(|m| m.content.clone())
                                 .unwrap_or_default();
+
+                            let tool_calls = parsed.message.as_ref()
+                                .and_then(|m| m.tool_calls.clone());
 
                             let _ = app.emit(
                                 "llm-chunk",
                                 LlmChunk {
                                     content: content.clone(),
                                     done: parsed.done,
+                                    tool_calls,
                                 },
                             );
 
@@ -174,12 +204,14 @@ impl OllamaClient {
         // Drain any remaining partial line (shouldn't happen with well-formed stream)
         if !line_buf.trim().is_empty() {
             if let Ok(parsed) = serde_json::from_str::<ChatResponseChunk>(line_buf.trim()) {
-                let content = parsed.message.map(|m| m.content).unwrap_or_default();
+                let content = parsed.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
+                let tool_calls = parsed.message.as_ref().and_then(|m| m.tool_calls.clone());
                 let _ = app.emit(
                     "llm-chunk",
                     LlmChunk {
                         content,
                         done: true,
+                        tool_calls,
                     },
                 );
             }

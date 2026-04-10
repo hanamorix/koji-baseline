@@ -1,0 +1,102 @@
+<h2>Agent Session UI — How should the LLM agent look?</h2>
+<p class="subtitle">When the agent is active, the terminal becomes a collaborative workspace</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a0a;padding:16px;font-family:'Courier New',monospace;line-height:1.5;font-size:11px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ff6a00,transparent);opacity:0.3;"></div>
+      <div style="color:#996b00;padding:4px 0;">◉ CPU 8% │ MEM 2.1G │ <span style="color:#ff8c00;">nell-dpo</span> <span style="color:#3a6a3a;">●</span> │ <span style="color:#ff6a00;font-weight:bold;">AGENT</span> │ 令和八年 09:41</div>
+      <div style="color:#ff6a00;opacity:0.15;font-size:9px;">▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁</div>
+      <div style="height:6px;"></div>
+      <div style="color:#cc7a00;">  <span style="color:#ff8c00;">you</span> › find all TODO comments in this project</div>
+      <div style="height:4px;"></div>
+      <div style="border-left:2px solid #4a3a1a;padding-left:10px;margin-left:16px;">
+        <div style="color:#996b00;font-size:10px;">🤖 <span style="color:#ff8c00;">nell-dpo</span></div>
+        <div style="color:#cc7a00;">I'll search for TODO comments. Running:</div>
+        <div style="height:4px;"></div>
+        <div style="background:#1a1208;padding:4px 8px;border-radius:3px;display:inline-block;">
+          <span style="color:#996b00;">$</span> <span style="color:#ff8c00;">grep -r "TODO" --include="*.ts" --include="*.rs" .</span>
+        </div>
+        <div style="height:4px;"></div>
+        <div style="color:#5a4a1a;font-size:10px;">[Enter] approve  [Esc] reject  [e] edit</div>
+      </div>
+      <div style="height:6px;"></div>
+      <div style="color:#ff6a00;opacity:0.15;font-size:9px;">▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁</div>
+      <div style="color:#996b00;">▸ ~/koji-baseline on main │ <span style="color:#ff6a00;">agent active</span></div>
+      <style>@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}</style>
+    </div>
+    <div class="card-body">
+      <h3>A. Inline Agent</h3>
+      <p>Agent messages appear inline in the terminal flow with a left border. Commands show in a code block with approve/reject controls. "AGENT" badge in top bar, "agent active" in bottom bar. Your terminal stays usable — agent and shell share the space.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a0a;padding:16px;font-family:'Courier New',monospace;line-height:1.5;font-size:11px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ff6a00,transparent);opacity:0.3;"></div>
+      <div style="color:#996b00;padding:4px 0;">◉ CPU 8% │ MEM 2.1G │ <span style="color:#ff8c00;">nell-dpo</span> <span style="color:#3a6a3a;">●</span> │ 令和八年 09:41</div>
+      <div style="color:#ff6a00;opacity:0.15;font-size:9px;">▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁</div>
+      <div style="display:flex;height:160px;">
+        <div style="flex:1;padding:4px 0;">
+          <div style="color:#5a4a1a;font-size:10px;margin-bottom:4px;">── TERMINAL ──</div>
+          <div style="color:#cc7a00;">  <span style="color:#ff8c00;">◉</span> ls src/</div>
+          <div style="color:#996b00;">  commands/ themes/ terminal/</div>
+          <div style="color:#cc7a00;">  <span style="color:#ff8c00;">◉</span> <span style="color:#ff8c00;">|</span></div>
+        </div>
+        <div style="width:1px;background:#4a3a1a;margin:0 8px;"></div>
+        <div style="flex:1;padding:4px 0;">
+          <div style="color:#5a4a1a;font-size:10px;margin-bottom:4px;">── AGENT ──</div>
+          <div style="color:#996b00;font-size:10px;">🤖 <span style="color:#ff8c00;">nell-dpo</span></div>
+          <div style="color:#cc7a00;">Found 3 TODOs:</div>
+          <div style="color:#996b00;">  grid.ts:42</div>
+          <div style="color:#996b00;">  main.ts:118</div>
+          <div style="color:#996b00;">  boot.ts:7</div>
+          <div style="height:4px;"></div>
+          <div style="color:#cc7a00;">Want me to fix them?</div>
+          <div style="color:#cc7a00;"><span style="color:#ff8c00;">you</span> › <span style="animation:blink 1s infinite;color:#ff8c00;">|</span></div>
+        </div>
+      </div>
+      <div style="color:#ff6a00;opacity:0.15;font-size:9px;">▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁</div>
+      <div style="color:#996b00;">▸ ~/koji-baseline on main</div>
+    </div>
+    <div class="card-body">
+      <h3>B. Split Pane Agent</h3>
+      <p>Agent gets its own pane — terminal on the left, agent conversation on the right. Both always visible. You can type in either pane. More space for the agent to show results without blocking your terminal.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a0a;padding:16px;font-family:'Courier New',monospace;line-height:1.5;font-size:11px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ff6a00,transparent);opacity:0.3;"></div>
+      <div style="color:#996b00;padding:4px 0;">◉ CPU 8% │ MEM 2.1G │ <span style="color:#ff8c00;">nell-dpo</span> <span style="color:#3a6a3a;">●</span> │ 令和八年 09:41</div>
+      <div style="color:#ff6a00;opacity:0.15;font-size:9px;">▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁</div>
+      <div style="height:6px;"></div>
+      <div style="color:#996b00;font-size:10px;">🤖 <span style="color:#ff8c00;">nell-dpo</span> <span style="color:#5a4a1a;">— agent session</span></div>
+      <div style="height:4px;"></div>
+      <div style="color:#cc7a00;"><span style="color:#ff8c00;">you</span> › find all TODO comments</div>
+      <div style="height:4px;"></div>
+      <div style="color:#cc7a00;">I'll search the codebase. Let me run a grep.</div>
+      <div style="height:4px;"></div>
+      <div style="background:#1a1208;padding:6px 8px;border-radius:3px;">
+        <div style="color:#996b00;">$ grep -r "TODO" --include="*.ts" --include="*.rs" .</div>
+        <div style="color:#5a4a1a;">./src/terminal/grid.ts:42: // TODO: optimize</div>
+        <div style="color:#5a4a1a;">./src/main.ts:118: // TODO: cleanup</div>
+      </div>
+      <div style="height:4px;"></div>
+      <div style="color:#cc7a00;">Found 2 TODOs. Want me to address them?</div>
+      <div style="height:4px;"></div>
+      <div style="color:#cc7a00;"><span style="color:#ff8c00;">you</span> › <span style="animation:blink 1s infinite;color:#ff8c00;">|</span></div>
+      <div style="height:4px;"></div>
+      <div style="color:#5a4a1a;font-size:10px;">[Esc] exit agent  [Ctrl+T] toggle terminal</div>
+      <div style="height:6px;"></div>
+      <div style="color:#ff6a00;opacity:0.15;font-size:9px;">▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁</div>
+      <div style="color:#996b00;">▸ ~/koji-baseline on main │ <span style="color:#ff6a00;">Esc to exit agent</span></div>
+    </div>
+    <div class="card-body">
+      <h3>C. Full-Screen Agent Mode</h3>
+      <p>Agent takes over the entire terminal viewport — like Claude Code does. Dedicated chat interface with your prompt at the bottom. Command output shows inline. Press Esc to return to normal terminal. Ctrl+T toggles between agent and terminal.</p>
+    </div>
+  </div>
+
+</div>

@@ -1,7 +1,7 @@
 // router.ts — Slash command dispatcher
 // dispatchCommand("/foo bar baz") → Promise<DispatchResult> | null
 
-import { handleHelp, handleTheme, handleLlm, handleVersion, handleAgent, handleExit } from "./handlers";
+import { handleHelp, handleTheme, handleLlm, handleVersion, handleAgent, handleExit, handleFont } from "./handlers";
 import type { MenuItem } from "../overlay/menu";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,6 +51,9 @@ export function dispatchCommand(input: string): Promise<DispatchResult> | null {
 
     case "exit":
       return handleExit(rest);
+
+    case "font":
+      return handleFont(rest.join(" "));
 
     default:
       // Unknown command — surface a helpful error rather than silent null

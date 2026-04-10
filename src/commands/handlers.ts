@@ -5,7 +5,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { THEMES, THEME_NAMES } from "../themes/themes";
 import { themeManager } from "../themes/manager";
 import { agentPane } from "../agent/pane";
-import type { MenuResult } from "./router";
+import { fontManager, FONT_OPTIONS } from "../fonts/fonts";
+import type { MenuResult, DispatchResult } from "./router";
 
 // ─── /help ────────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,7 @@ export async function handleHelp(): Promise<MenuResult> {
   const items = [
     { label: "/help",             value: "help",      description: "Show this command reference" },
     { label: "/theme",            value: "theme",     description: "Open interactive theme picker" },
+    { label: "/font",             value: "font",      description: "Change terminal font" },
     { label: "/agent",            value: "agent",     description: "Open agent split-pane" },
     { label: "/exit",             value: "exit",      description: "Close agent split-pane" },
     { label: "/version",          value: "version",   description: "Print version" },
@@ -32,6 +34,7 @@ export async function handleHelp(): Promise<MenuResult> {
       const result = await (async () => {
         switch (value) {
           case "theme":    return handleTheme([]);
+          case "font":     return handleFont("");
           case "agent":    return handleAgent([]);
           case "exit":     return handleExit([]);
           case "version":  return handleVersion().then((o) => ({ output: o, isError: false }));
@@ -244,4 +247,54 @@ export async function handleExit(_args: string[]): Promise<{ output: string; isE
 
 export async function handleVersion(): Promise<string> {
   return "Kōji Baseline v0.3.0";
+}
+
+// ─── /font ────────────────────────────────────────────────────────────────────
+
+export function handleFont(args: string): Promise<DispatchResult> {
+  if (!args || args.trim() === "") {
+    // No args → interactive font picker
+    const result: MenuResult = {
+      type: "menu",
+      items: FONT_OPTIONS.map((f) => ({
+        label: f.name,
+        value: f.name,
+        description: f.description,
+        active: f.family === fontManager.getCurrent(),
+      })),
+      onSelect: async (value: string) => {
+        const ok = await fontManager.apply(value);
+        if (!ok) {
+          const { overlay } = await import("../overlay/overlay");
+          overlay.showMessage(`Unknown font: ${value}`, true);
+        }
+      },
+      onPreview: (value: string) => {
+        const option = FONT_OPTIONS.find((f) => f.name === value);
+        if (option) {
+          fontManager.apply(option.name).catch(console.warn);
+        }
+      },
+      onCancel: () => {
+        fontManager.loadSaved().catch(console.warn);
+      },
+    };
+    return Promise.resolve(result);
+  }
+
+  // Named font: /font Iosevka
+  const option = FONT_OPTIONS.find(
+    (f) => f.name.toLowerCase() === args.trim().toLowerCase()
+  );
+  if (option) {
+    return fontManager.apply(option.name).then(() => ({
+      output: `Font: ${option.name}`,
+      isError: false,
+    }));
+  }
+
+  return Promise.resolve({
+    output: `Unknown font. Available: ${FONT_OPTIONS.map((f) => f.name).join(", ")}`,
+    isError: true,
+  });
 }

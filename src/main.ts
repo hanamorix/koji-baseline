@@ -23,6 +23,7 @@ import type { MenuResult } from "./overlay/menu";
 import { agentPane } from "./agent/pane";
 import { llmOnboarding } from "./llm/onboarding";
 import { SelectionManager } from "./terminal/selection";
+import { fontManager } from "./fonts/fonts";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,19 @@ container.removeChild(bootCanvas);
 // ─── Terminal grid ────────────────────────────────────────────────────────────
 
 export const domGrid = new DOMGrid(container);
+
+// ── Font system ───────────────────────────────────────────────────────────
+fontManager.setChangeCallback((font, size, ligatures) => {
+  domGrid.setFont(font, size, ligatures);
+  // Recalculate grid dimensions after font change
+  const { rows, cols } = domGrid.measureGrid();
+  domGrid.resize(rows, cols);
+  invoke("resize_terminal", { rows, cols });
+});
+
+// Load saved font preference
+fontManager.loadSaved();
+
 const selection = new SelectionManager(domGrid.getGridElement());
 invoke("load_config", { key: "copy_on_select" }).then((val: unknown) => {
   if (val === "false") selection.setCopyOnSelect(false);
@@ -285,6 +299,23 @@ window.addEventListener("keydown", async (event) => {
       scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: "smooth" });
       return;
     }
+  }
+
+  // Font size: Cmd+Plus / Cmd+Minus / Cmd+0 (reset)
+  if (metaKey && (key === "=" || key === "+")) {
+    event.preventDefault();
+    fontManager.incrementSize(1);
+    return;
+  }
+  if (metaKey && key === "-") {
+    event.preventDefault();
+    fontManager.incrementSize(-1);
+    return;
+  }
+  if (metaKey && key === "0") {
+    event.preventDefault();
+    fontManager.setSize(14); // reset to default
+    return;
   }
 
   const seq = keyToAnsi(event);

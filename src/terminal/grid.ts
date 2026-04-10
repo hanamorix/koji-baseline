@@ -1,5 +1,8 @@
 // grid.ts — Canvas 2D terminal grid renderer
-// Paints the full GridSnapshot every frame. Cursor breathes. Wallace amber optional.
+// Paints the full GridSnapshot every frame. Cursor breathes. Wallace amber on.
+// Scrollback fade dims lines above the cursor — atmosphere layer 1.
+
+import { applyScrollbackFade } from "./scrollback";
 
 const CELL_WIDTH = 9;
 const CELL_HEIGHT = 18;
@@ -124,9 +127,10 @@ export class TerminalGrid {
         ctx.fillStyle = rgbToHex(cell.bg);
         ctx.fillRect(x, y, CELL_WIDTH, CELL_HEIGHT);
 
-        // Character
+        // Character — apply scrollback fade above cursor row
         if (cell.character && cell.character.trim() !== "") {
-          ctx.fillStyle = rgbToHex(cell.fg);
+          const fadedFg = applyScrollbackFade(cell.fg, row, snapshot.rows, snapshot.cursor.row);
+          ctx.fillStyle = rgbToHex(fadedFg);
           ctx.font = buildFont(cell.bold, cell.italic);
           ctx.globalAlpha = cell.dim ? 0.5 : 1.0;
           ctx.fillText(cell.character, x, y + 1);
@@ -134,7 +138,7 @@ export class TerminalGrid {
 
           // Underline
           if (cell.underline) {
-            ctx.fillStyle = rgbToHex(cell.fg);
+            ctx.fillStyle = rgbToHex(fadedFg);
             ctx.fillRect(x, y + CELL_HEIGHT - 2, CELL_WIDTH, 1);
           }
         }

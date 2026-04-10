@@ -5,11 +5,23 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { TerminalGrid, GridSnapshot } from "./terminal/grid";
 import { initDashboard } from "./dashboard/status-bar";
+import { WaveformAnimator } from "./animation/waveform";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 // Start clock + system-stats listener before anything else
 initDashboard();
+
+// Waveform animator — driven by CPU load from system-stats events
+const waveform = new WaveformAnimator("waveform-top", "waveform-bottom");
+waveform.start();
+
+// Pipe CPU percent into the waveform speed
+listen<{ cpu_percent: number }>("system-stats", (event) => {
+  waveform.setCpuPercent(event.payload.cpu_percent);
+}).catch((err) => {
+  console.warn("waveform system-stats listener failed:", err);
+});
 
 const container = document.getElementById("terminal-container");
 if (!container) throw new Error("#terminal-container not found");

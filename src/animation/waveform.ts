@@ -55,8 +55,10 @@ export class WaveformAnimator {
   private paint(el: HTMLElement | null, phase: number): void {
     if (!el) return;
 
-    // Fill the element width with characters; measure char count from clientWidth
-    const charCount = Math.max(Math.floor((el.clientWidth || 800) / 7), 40);
+    // Fill the element width with characters; measure char count from clientWidth.
+    // Use 6px per character — closer to actual rendered width of the block glyphs
+    // at 10px font size. Divisor of 7 left a gap at the right edge.
+    const charCount = Math.max(Math.floor((el.clientWidth || 800) / 6), 40);
     let out = "";
     for (let i = 0; i < charCount; i++) {
       // Sine in [-1, 1] → normalised [0, 1] → index into WAVE_CHARS

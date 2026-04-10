@@ -9,59 +9,54 @@ import type { MenuResult } from "./router";
 
 // ─── /help ────────────────────────────────────────────────────────────────────
 
-export async function handleHelp(): Promise<string> {
-  const rows = [
-    ["/help",                   "Show this command reference"],
-    ["/version",                "Print Kōji version string"],
-    ["/theme",                  "Open interactive theme picker"],
-    ["/theme <name>",           "Switch to named theme directly"],
-    ["/llm",                    "Check Ollama connection status"],
-    ["/llm connect",            "Alias for status check"],
-    ["/llm model <name>",       "Hot-swap the active LLM model"],
-    ["/llm models",             "Open interactive model picker"],
-    ["/llm pull <name>",        "Pull a model from Ollama registry"],
-    ["/llm autorun off",        "Disable agent autorun (safest)"],
-    ["/llm autorun safe",       "Autorun read-only tool calls only"],
-    ["/llm autorun full",       "Autorun all tool calls (caution!)"],
-    ["/llm recommend",          "Show recommended models table"],
-    ["/llm provider",           "List configured LLM providers"],
-    ["/llm provider <name>",    "Switch active LLM provider"],
-    ["/agent",                  "Open agent split-pane"],
-    ["/exit",                   "Close agent split-pane"],
-    [">> <question>",           "Send a prompt directly to the LLM"],
+export async function handleHelp(): Promise<MenuResult> {
+  const items = [
+    { label: "/help",             value: "help",      description: "Show this command reference" },
+    { label: "/theme",            value: "theme",     description: "Open interactive theme picker" },
+    { label: "/agent",            value: "agent",     description: "Open agent split-pane" },
+    { label: "/exit",             value: "exit",      description: "Close agent split-pane" },
+    { label: "/version",          value: "version",   description: "Print version" },
+    { label: "/llm autorun",      value: "autorun",   description: "Set agent tool approval level" },
+    { label: "/llm recommend",    value: "recommend", description: "Show recommended models" },
+    { label: "/llm models",       value: "models",    description: "Open interactive model picker" },
+    { label: "/llm model <name>", value: "model",     description: "Hot-swap the active LLM model" },
+    { label: "/llm pull <name>",  value: "pull",      description: "Pull a model from Ollama registry" },
+    { label: ">> question",       value: "query",     description: "Ask the LLM inline" },
   ];
 
-  const colW = Math.max(...rows.map((r) => r[0].length)) + 2;
-  const border = "─".repeat(colW) + "┬" + "─".repeat(48);
+  return {
+    type: "menu" as const,
+    items,
+    onSelect: async (value: string) => {
+      // For actionable commands, dispatch them; for informational, show their description
+      const result = await (async () => {
+        switch (value) {
+          case "theme":    return handleTheme([]);
+          case "agent":    return handleAgent([]);
+          case "exit":     return handleExit([]);
+          case "version":  return handleVersion().then((o) => ({ output: o, isError: false }));
+          case "autorun":  return { output: "Usage: /llm autorun off|safe|full", isError: false };
+          case "recommend": return handleLlm(["recommend"]);
+          case "models":   return handleLlm(["models"]);
+          case "model":    return { output: "Usage: /llm model <name>", isError: false };
+          case "pull":     return { output: "Usage: /llm pull <name>", isError: false };
+          case "query":    return { output: "Type >> followed by your question and press Enter.", isError: false };
+          default:         return { output: "Type /help to see this menu again.", isError: false };
+        }
+      })();
 
-  const lines: string[] = [
-    "┌" + border + "┐",
-    "│" + " Command".padEnd(colW) + "│" + " Description".padEnd(48) + "│",
-    "├" + border + "┤",
-  ];
+      // Import overlay lazily to avoid circular deps
+      const { openMenu: _openMenu } = await import("../overlay/menu");
+      const { overlay: _overlay } = await import("../overlay/overlay");
 
-  for (const [cmd, desc] of rows) {
-    lines.push("│" + (" " + cmd).padEnd(colW) + "│" + (" " + desc).padEnd(48) + "│");
-  }
-
-  lines.push("└" + "─".repeat(colW) + "┴" + "─".repeat(48) + "┘");
-
-  // ── Recommended Models section ─────────────────────────────────────────────
-  lines.push("");
-  lines.push("Recommended Models:");
-  lines.push("─".repeat(colW + 1 + 48));
-  const recRows = [
-    ["qwen2.5:7b",       "Best all-round, fast, small footprint"],
-    ["qwen2.5-coder:7b", "Code tasks, tool use, structured output"],
-    ["mistral:7b",       "Strong reasoning, good for prose"],
-    ["phi4:14b",         "High quality, needs 12GB+ VRAM"],
-    ["llama3.2:3b",      "Ultra-fast, tiny, great for quick hits"],
-  ];
-  for (const [model, note] of recRows) {
-    lines.push("  " + model.padEnd(colW - 1) + note);
-  }
-
-  return lines.join("\n");
+      if (result && "type" in result && (result as MenuResult).type === "menu") {
+        _openMenu(result as MenuResult);
+      } else if (result) {
+        const cmd = result as { output: string; isError: boolean };
+        _overlay.showMessage(cmd.output, cmd.isError);
+      }
+    },
+  };
 }
 
 // ─── /theme ───────────────────────────────────────────────────────────────────

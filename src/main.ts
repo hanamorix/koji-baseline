@@ -60,7 +60,7 @@ container.removeChild(bootCanvas);
 
 // ─── Terminal grid ────────────────────────────────────────────────────────────
 
-const grid = new TerminalGrid(container);
+export const grid = new TerminalGrid(container);
 
 // ─── Idle animator ────────────────────────────────────────────────────────────
 

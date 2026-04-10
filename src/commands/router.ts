@@ -35,7 +35,7 @@ export function dispatchCommand(input: string): Promise<DispatchResult> | null {
 
   switch (command) {
     case "help":
-      return handleHelp().then((output) => ({ output, isError: false }));
+      return handleHelp();
 
     case "version":
       return handleVersion().then((output) => ({ output, isError: false }));

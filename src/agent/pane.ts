@@ -4,6 +4,7 @@
 
 import { AgentSession, type AgentEvent } from "./agent";
 import { getActiveProvider } from "../providers/provider";
+import { invoke } from "@tauri-apps/api/core";
 
 export class AgentPane {
   private session: AgentSession | null = null;
@@ -36,11 +37,22 @@ export class AgentPane {
     container.style.flexDirection = "row";
     container.style.alignItems = "stretch";
 
-    // Shrink the canvas to 60 %
+    // Shrink the canvas to 60 % — calculate actual pixel dimensions so
+    // the canvas internal resolution matches the CSS display size (fixes DPI blur).
     const canvas = container.querySelector("canvas");
     if (canvas) {
       (canvas as HTMLElement).style.flexShrink = "0";
-      (canvas as HTMLElement).style.width = "60%";
+      const containerWidth = container.clientWidth;
+      const targetWidth = Math.max(Math.floor(containerWidth * 0.6), 400);
+      (canvas as HTMLElement).style.width = `${targetWidth}px`;
+
+      // Lazily import grid to avoid a circular dependency at module load time
+      import("../main").then(({ grid }) => {
+        const cols = Math.max(1, Math.floor(targetWidth / 9));    // CELL_WIDTH = 9
+        const rows = Math.max(1, Math.floor(container.clientHeight / 18)); // CELL_HEIGHT = 18
+        grid.resize(rows, cols);
+        invoke("resize_terminal", { rows, cols }).catch(console.warn);
+      }).catch(console.warn);
     }
 
     // ── Divider ──────────────────────────────────────────────────────────────
@@ -60,7 +72,6 @@ export class AgentPane {
     try {
       const provider = await getActiveProvider();
       // Try to grab model name from config (best-effort)
-      const { invoke } = await import("@tauri-apps/api/core");
       const model = await invoke<string>("load_config", { key: "activeModel" }).catch(() => "");
       const providerName = provider.name;
       headerLabel = `🤖 ${model || providerName} via ${providerName}`;
@@ -169,17 +180,27 @@ export class AgentPane {
     if (this.paneEl) container.removeChild(this.paneEl);
     if (this.dividerEl) container.removeChild(this.dividerEl);
 
-    // Restore canvas width
+    // Restore canvas width — recalculate full dimensions after pane removal
     const canvas = container.querySelector("canvas");
-    if (canvas) {
-      (canvas as HTMLElement).style.width = "100%";
-      (canvas as HTMLElement).style.flexShrink = "";
-    }
 
-    // Restore container layout
+    // Restore container layout first so clientWidth reflects full size
     container.style.display = "";
     container.style.flexDirection = "";
     container.style.alignItems = "";
+
+    if (canvas) {
+      (canvas as HTMLElement).style.width = "";
+      (canvas as HTMLElement).style.flexShrink = "";
+
+      // Resize grid back to full container
+      import("../main").then(({ grid }) => {
+        const fullWidth = container.clientWidth;
+        const cols = Math.max(1, Math.floor(fullWidth / 9));
+        const rows = Math.max(1, Math.floor(container.clientHeight / 18));
+        grid.resize(rows, cols);
+        invoke("resize_terminal", { rows, cols }).catch(console.warn);
+      }).catch(console.warn);
+    }
 
     // Remove capture handler
     if (this.captureHandler) {

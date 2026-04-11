@@ -127,10 +127,13 @@ llm.onResponseUpdate((text, done) => {
   }
 }
 
-// Expose onboarding handler for the >> badge onclick in index.html
-(window as unknown as Record<string, unknown>)["__kojiLlmOnboard"] = () => {
-  llmOnboarding.run().catch(console.error);
-};
+// Wire the LLM badge click handler (CSP blocks inline onclick)
+const llmBadge = document.getElementById("llm-badge");
+if (llmBadge) {
+  llmBadge.addEventListener("click", () => {
+    llmOnboarding.run().catch(console.error);
+  });
+}
 
 // ─── CWD tracking — update active tab name ───────────────────────────────────
 listen<{ path: string }>("cwd-changed", (event) => {

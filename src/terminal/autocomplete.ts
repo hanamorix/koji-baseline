@@ -5,9 +5,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type { DOMGrid } from "./dom-grid";
 
 const SLASH_COMMANDS = [
-  "/help", "/version", "/theme", "/font", "/llm", "/llm models",
-  "/llm recommend", "/llm autorun off", "/llm autorun safe",
-  "/llm autorun full", "/agent", "/exit",
+  "/help", "/version", "/theme", "/font", "/cursor", "/llm",
+  "/llm models", "/llm recommend", "/llm autorun off",
+  "/llm autorun safe", "/llm autorun full", "/agent", "/exit",
 ];
 
 const PATH_COMMANDS = new Set([

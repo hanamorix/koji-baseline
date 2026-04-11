@@ -9,6 +9,7 @@ export class TabManager {
   private activeTabId = "";
   private parentContainer: HTMLElement;
   private tabsContainerEl: HTMLElement;
+  private _renaming = false;
 
   constructor(parentContainer: HTMLElement) {
     this.parentContainer = parentContainer;
@@ -111,6 +112,7 @@ export class TabManager {
   }
 
   private renderTabBar(): void {
+    if (this._renaming) return; // Don't destroy the rename input
     this.tabsContainerEl.innerHTML = "";
     for (const id of this.tabOrder) {
       const session = this.tabs.get(id);
@@ -140,6 +142,8 @@ export class TabManager {
     const session = this.tabs.get(id);
     if (!session) return;
 
+    this._renaming = true;
+
     const input = document.createElement("input");
     input.type = "text";
     input.value = session.name;
@@ -150,12 +154,9 @@ export class TabManager {
     input.select();
 
     const finish = () => {
+      this._renaming = false;
       session.name = input.value.trim() || session.name;
-      const newLabel = document.createElement("span");
-      newLabel.className = "tabbar-tab-label";
-      newLabel.textContent = session.name;
-      newLabel.addEventListener("dblclick", (e) => { e.stopPropagation(); this.startRename(id, newLabel); });
-      input.replaceWith(newLabel);
+      this.renderTabBar(); // Rebuild the tab bar with the new name
     };
 
     input.addEventListener("blur", finish);

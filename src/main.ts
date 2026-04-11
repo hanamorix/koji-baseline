@@ -144,8 +144,9 @@ listen<{ path: string }>("cwd-changed", (event) => {
 // ─── Theme applied — force grid redraw so colour changes take effect immediately
 
 listen("theme-applied", () => {
-  const tab = tabManager.getActive();
-  if (tab) {
+  // Force full re-render of ALL tabs — inline styles have stale colors
+  for (const tab of tabManager.getAllTabs()) {
+    tab.grid.invalidateAllRows();
     const snap = tab.grid.getLastSnapshot();
     if (snap) tab.grid.render(snap);
   }

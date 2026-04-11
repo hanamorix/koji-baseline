@@ -177,6 +177,14 @@ export class DOMGrid {
     return this.gridEl;
   }
 
+  /** Invalidate all row hashes so the next render rebuilds every row.
+   *  Call after theme changes — inline styles need regeneration from new colors. */
+  invalidateAllRows(): void {
+    for (const row of this.viewportRows) {
+      row.hash = "";
+    }
+  }
+
   getCursorPos(): { row: number; col: number } {
     return { row: this.cursorRow, col: this.cursorCol };
   }

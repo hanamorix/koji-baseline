@@ -23,6 +23,10 @@ export class TabManager {
     return this.tabs.get(this.activeTabId);
   }
 
+  getAllTabs(): TabSession[] {
+    return this.tabOrder.map((id) => this.tabs.get(id)!).filter(Boolean);
+  }
+
   getTabCount(): number { return this.tabs.size; }
 
   async createTab(): Promise<TabSession> {

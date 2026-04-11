@@ -10,6 +10,7 @@ import { TransitionEffects } from "../animation/effects";
 import { TerminalSearch } from "../terminal/search";
 import { applyClickableRegions } from "../terminal/clickable";
 import { fontManager } from "../fonts/fonts";
+import { themeManager } from "../themes/manager";
 
 export class TabSession {
   readonly id: string;
@@ -72,6 +73,10 @@ export class TabSession {
     this.grid.resize(rows, cols);
 
     await invoke("create_session", { tabId: this.id, rows, cols });
+
+    // Apply current theme to the new session's terminal engine
+    // (set_theme_colors applies to all sessions, including this new one)
+    await themeManager.syncCurrentTheme();
 
     const outputUn = await listen<GridSnapshot>(`terminal-output-${this.id}`, (event) => {
       this.grid.render(event.payload);

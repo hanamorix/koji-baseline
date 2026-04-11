@@ -96,6 +96,13 @@ class ThemeManager {
     });
   }
 
+  /** Re-sync the current theme's terminal colors to the Rust backend.
+   *  Called after creating a new session so it picks up the active palette. */
+  async syncCurrentTheme(): Promise<void> {
+    const theme = THEMES[this.currentName];
+    if (theme) await this.syncTerminalColors(theme.terminalColors);
+  }
+
   // ── loadSaved ──────────────────────────────────────────────────────────────
   // Called on startup — reads persisted theme from config and applies it.
   // Falls through to DEFAULT_THEME if no config exists yet.

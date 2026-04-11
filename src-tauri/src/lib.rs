@@ -5,6 +5,7 @@ pub mod monitor;
 pub mod ollama;
 pub mod openai_compat;
 pub mod pty;
+pub mod osc;
 pub mod terminal;
 
 use std::collections::HashMap;

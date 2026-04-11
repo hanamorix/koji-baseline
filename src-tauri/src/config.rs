@@ -13,6 +13,7 @@ fn default_font_size() -> u16 { 14 }
 fn default_cursor_style() -> String { "block".into() }
 fn default_true() -> bool { true }
 fn default_min_duration() -> u64 { 10 }
+fn default_suggest_debounce_ms() -> u64 { 500 }
 
 fn default_new_tab() -> String { "cmd+t".into() }
 fn default_close_tab() -> String { "cmd+w".into() }
@@ -42,6 +43,8 @@ pub struct KojiConfig {
     pub notifications: NotificationConfig,
     #[serde(default)]
     pub keybindings: KeybindingConfig,
+    #[serde(default)]
+    pub ai: AiConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,6 +154,37 @@ impl Default for KeybindingConfig {
             paste: default_paste(),
             split_right: default_split_right(),
             split_down: default_split_down(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiConfig {
+    /// Auto-diagnose failed commands (exit code != 0) and show inline explanation
+    #[serde(default = "default_true")]
+    pub auto_diagnose: bool,
+    /// Show context-aware command suggestions while typing
+    #[serde(default = "default_true")]
+    pub suggest_enabled: bool,
+    /// Debounce delay (ms) before triggering suggestions
+    #[serde(default = "default_suggest_debounce_ms")]
+    pub suggest_debounce_ms: u64,
+    /// Persist AI interactions to a searchable history file
+    #[serde(default = "default_true")]
+    pub history_file: bool,
+    /// Enable AI blocks — rich inline panels for errors, diffs, and explanations
+    #[serde(default = "default_true")]
+    pub blocks_enabled: bool,
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            auto_diagnose: true,
+            suggest_enabled: true,
+            suggest_debounce_ms: default_suggest_debounce_ms(),
+            history_file: true,
+            blocks_enabled: true,
         }
     }
 }
@@ -313,6 +347,12 @@ mod tests {
         assert!(config.notifications.enabled);
         assert_eq!(config.keybindings.new_tab, "cmd+t");
         assert_eq!(config.keybindings.split_down, "cmd+shift+d");
+        // AI section
+        assert!(config.ai.auto_diagnose);
+        assert!(config.ai.suggest_enabled);
+        assert_eq!(config.ai.suggest_debounce_ms, 500);
+        assert!(config.ai.history_file);
+        assert!(config.ai.blocks_enabled);
     }
 
     #[test]
@@ -324,6 +364,12 @@ mod tests {
         assert!(config.terminal.shell_integration);
         assert!(config.notifications.enabled);
         assert_eq!(config.notifications.min_duration_seconds, 10);
+        // AI defaults from empty config
+        assert!(config.ai.auto_diagnose);
+        assert!(config.ai.suggest_enabled);
+        assert_eq!(config.ai.suggest_debounce_ms, 500);
+        assert!(config.ai.history_file);
+        assert!(config.ai.blocks_enabled);
     }
 
     #[test]

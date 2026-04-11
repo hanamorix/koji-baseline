@@ -37,6 +37,25 @@ enabled = true
 # Minimum command duration (seconds) before a notification fires
 min_duration_seconds = 10
 
+# ─── AI ──────────────────────────────────────────────────────────────────────
+
+[ai]
+
+# Auto-diagnose failed commands (exit code != 0) and show inline explanation
+auto_diagnose = true
+
+# Show context-aware command suggestions while typing
+suggest_enabled = true
+
+# Debounce delay (ms) before triggering suggestions — lower = snappier, higher = fewer API calls
+suggest_debounce_ms = 500
+
+# Persist AI interactions (diagnoses, suggestions) to a searchable history file
+history_file = true
+
+# Enable AI blocks — rich inline panels for errors, diffs, and explanations
+blocks_enabled = true
+
 # ─── Keybindings ─────────────────────────────────────────────────────────────
 # Format: modifier+key (cmd, ctrl, shift, alt)
 # Examples: "cmd+t", "cmd+shift+p", "ctrl+alt+delete" (jk don't do that)

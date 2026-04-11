@@ -19,6 +19,8 @@ import { agentPane } from "./agent/pane";
 import { llmOnboarding } from "./llm/onboarding";
 import { fontManager } from "./fonts/fonts";
 import { TabManager } from "./tabs/tab-manager";
+import { KeybindingManager } from "./config/keybindings";
+import { openPalette, isPaletteOpen } from "./config/palette";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -48,6 +50,49 @@ container.removeChild(bootCanvas);
 // ─── Tab Manager ─────────────────────────────────────────────────────────────
 export const tabManager = new TabManager(container);
 await tabManager.createTab();
+
+// ─── Keybinding system ───────────────────────────────────────────────────────
+
+const keybindings = new KeybindingManager();
+
+// Register all actions with default combos
+keybindings.register("new_tab", "cmd+t", () => { tabManager.createTab().catch(console.error); });
+keybindings.register("close_tab", "cmd+w", () => tabManager.closeActiveTab());
+keybindings.register("next_tab", "cmd+shift+]", () => tabManager.nextTab());
+keybindings.register("prev_tab", "cmd+shift+[", () => tabManager.prevTab());
+keybindings.register("palette", "cmd+shift+p", () => openPalette(keybindings));
+keybindings.register("search", "cmd+f", () => { tabManager.getActive()?.search.open(); });
+keybindings.register("clear", "cmd+k", () => {
+  const t = tabManager.getActive();
+  if (t) { t.grid.clearScrollback(); t.writePty(Array.from(new TextEncoder().encode("\x1b[2J\x1b[H"))).catch(console.error); }
+});
+keybindings.register("zone_up", "cmd+up", () => { tabManager.getActive()?.jumpToPreviousZone(); });
+keybindings.register("zone_down", "cmd+down", () => { tabManager.getActive()?.jumpToNextZone(); });
+keybindings.register("select_all", "cmd+a", () => {
+  const t = tabManager.getActive();
+  if (t) { const sel = window.getSelection(); if (sel) { const r = document.createRange(); r.selectNodeContents(t.grid.getScrollElement()); sel.removeAllRanges(); sel.addRange(r); } }
+});
+keybindings.register("paste", "cmd+v", () => { tabManager.getActive()?.selection.handlePaste().catch(console.error); });
+keybindings.register("copy", "cmd+c", () => {
+  const t = tabManager.getActive();
+  if (t) t.selection.handleCopy().then((copied) => { if (!copied) t.writePty([3]).catch(console.error); });
+});
+keybindings.register("font_up", "cmd+=", () => fontManager.incrementSize(1));
+keybindings.register("font_down", "cmd+-", () => fontManager.incrementSize(-1));
+keybindings.register("font_reset", "cmd+0", () => fontManager.setSize(14));
+
+// Load TOML config and update keybindings
+invoke("load_toml_config").then((config: unknown) => {
+  const cfg = config as { keybindings?: Record<string, string> };
+  if (cfg.keybindings) keybindings.updateFromConfig(cfg.keybindings);
+}).catch(() => {});
+
+// Hot reload: update keybindings when config changes
+listen("config-changed", (event: any) => {
+  if (event.payload?.keybindings) {
+    keybindings.updateFromConfig(event.payload.keybindings);
+  }
+}).catch(() => {});
 
 // ── Font system — route to active tab ────────────────────────────────────
 fontManager.setChangeCallback((font, size, ligatures) => {
@@ -194,132 +239,47 @@ new ResizeObserver(() => {
 window.addEventListener("keydown", async (event) => {
   const { key, ctrlKey, metaKey } = event;
 
-  // ── Skip if an input element has focus (agent pane, menu filter, etc.) ──
+  // Skip if input/textarea focused (except Escape for agent pane)
   const active = document.activeElement;
   if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
-    // Only intercept Escape (to close agent pane) — let everything else flow to the input
-    if (key === "Escape" && agentPane.isOpen) {
-      event.preventDefault();
-      agentPane.close();
-    }
+    if (key === "Escape" && agentPane.isOpen) { event.preventDefault(); agentPane.close(); }
     return;
   }
 
-  // ── Tab shortcuts ──────────────────────────────────────────────────────
-  if (metaKey && key === "t") {
-    event.preventDefault();
-    tabManager.createTab().catch((err) => console.error("Cmd+T tab failed:", err));
-    return;
-  }
-  if (metaKey && key === "w") {
-    event.preventDefault();
-    tabManager.closeActiveTab();
-    return;
-  }
-  if (metaKey && event.shiftKey && key === "]") {
-    event.preventDefault();
-    tabManager.nextTab();
-    return;
-  }
-  if (metaKey && event.shiftKey && key === "[") {
-    event.preventDefault();
-    tabManager.prevTab();
-    return;
-  }
+  // Command palette is open — let it handle all keys
+  if (isPaletteOpen()) return;
+
+  // Cmd+1-9 for tab switching (dynamic, not in keybinding system)
   if (metaKey && key >= "1" && key <= "9" && !event.shiftKey) {
     event.preventDefault();
     tabManager.switchToNumber(parseInt(key));
     return;
   }
 
-  // ── Get active tab for all remaining handlers ──────────────────────────
+  // Try keybinding system first
+  if (keybindings.handleKeyEvent(event)) return;
+
+  // Get active tab for remaining handlers
   const tab = tabManager.getActive();
   if (!tab) return;
 
-  // ── Cmd+F — search scrollback ────────────────────────────────────────────
-  if (metaKey && key === "f") {
-    event.preventDefault();
-    tab.search.open();
-    return;
-  }
+  // Escape — close agent pane if open
+  if (key === "Escape" && agentPane.isOpen) { event.preventDefault(); agentPane.close(); return; }
 
-  // ── Cmd+K — clear scrollback ───────────────────────────────────────────
-  if (metaKey && key === "k") {
-    event.preventDefault();
-    tab.grid.clearScrollback();
-    const clearSeq = "\x1b[2J\x1b[H";
-    const bytes = Array.from(new TextEncoder().encode(clearSeq));
-    tab.writePty(bytes).catch(console.error);
-    return;
-  }
-
-  // ── Cmd+Up/Down — jump between command zones ────────────────────────────
-  if (metaKey && key === "ArrowUp" && !event.shiftKey) {
-    event.preventDefault();
-    tab.jumpToPreviousZone();
-    return;
-  }
-  if (metaKey && key === "ArrowDown" && !event.shiftKey) {
-    event.preventDefault();
-    tab.jumpToNextZone();
-    return;
-  }
-
-  // ── Cmd+A — select all terminal text ──────────────────────────────────
-  if (metaKey && key === "a") {
-    event.preventDefault();
-    const sel = window.getSelection();
-    if (sel) {
-      const range = document.createRange();
-      range.selectNodeContents(tab.grid.getScrollElement());
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-    return;
-  }
-
-  // ── Cmd+V — paste from clipboard with bracketed paste escapes ───────────
-  if (metaKey && key === "v") {
-    event.preventDefault();
-    tab.selection.handlePaste().catch(console.error);
-    return;
-  }
-
-  // ── Cmd+C — copy selection if present, else send SIGINT (^C) ─────────────
-  if (metaKey && key === "c") {
-    event.preventDefault();
-    tab.selection.handleCopy().then((copied) => {
-      if (!copied) {
-        // No selection — send ^C (SIGINT)
-        tab.writePty([3]).catch(console.error);
-      }
-    });
-    return;
-  }
-
-  // ── Escape — close agent pane if open (before passing to PTY) ───────────
-  if (key === "Escape" && agentPane.isOpen) {
-    event.preventDefault();
-    agentPane.close();
-    return;
-  }
-
-  // ── Ctrl+C / Escape — reset input tracking (shell will show new prompt) ─
+  // Ctrl+C / Escape — reset input tracking
   if ((ctrlKey && key === "c") || key === "Escape") {
     tab.currentInput = "";
     tab.autocomplete.hide();
-    // Don't return — let it fall through to keyToAnsi to send to PTY
   }
 
-  // ── Autocomplete navigation ──────────────────────────────────────────────
+  // Autocomplete navigation
   if (key === "ArrowRight" && tab.autocomplete.getSuggestion()) {
     event.preventDefault();
     const suggestion = tab.autocomplete.accept();
     if (suggestion) {
       const remaining = suggestion.slice(tab.currentInput.length);
       tab.currentInput = suggestion;
-      const bytes = Array.from(new TextEncoder().encode(remaining));
-      tab.writePty(bytes).catch(console.error);
+      tab.writePty(Array.from(new TextEncoder().encode(remaining))).catch(console.error);
     }
     return;
   }
@@ -329,17 +289,15 @@ window.addEventListener("keydown", async (event) => {
     return;
   }
 
-  // Build up the current input line for context tracking
+  // Input line tracking + slash commands + LLM queries
   if (!ctrlKey) {
     if (key === "Enter") {
       tab.autocomplete.hide();
       const line = tab.currentInput.trim();
 
       if (line.startsWith("/")) {
-        // ── Slash command — intercept before PTY ──
         event.preventDefault();
-        // Clear the shell's input buffer (Ctrl+U = kill line, Ctrl+C = new prompt)
-        tab.writePty([21, 3]).catch(console.error); // \x15 \x03
+        tab.writePty([21, 3]).catch(console.error);
         tab.effects.commandSubmit();
         const result = dispatchCommand(line);
         if (result) {
@@ -356,35 +314,26 @@ window.addEventListener("keydown", async (event) => {
       }
 
       if (line.startsWith(">>")) {
-        // ── LLM query — intercept before PTY ──
         event.preventDefault();
-        // Clear the shell's input buffer
-        tab.writePty([21, 3]).catch(console.error); // \x15 \x03
+        tab.writePty([21, 3]).catch(console.error);
         overlay.dismiss();
-
-        // Auto-trigger onboarding if no model is configured yet
         const activeModel = await invoke<string>("load_config", { key: "activeModel" }).catch(() => "");
         let ollamaReady = false;
         try {
           const s = await invoke<{ model: string; state: string }>("check_ollama");
           ollamaReady = s.state === "ready" && !!s.model;
-        } catch {
-          ollamaReady = false;
-        }
-
+        } catch { ollamaReady = false; }
         if (!ollamaReady && !activeModel) {
           llmOnboarding.run().catch(console.error);
           tab.currentInput = "";
           return;
         }
-
         tab.effects.commandSubmit();
-        llm.query(line).catch((err) => console.error("llm.query failed:", err));
+        llm.query(line).catch(console.error);
         tab.currentInput = "";
         return;
       }
 
-      // Regular shell command — record it for context, fire submit effect
       if (line.length > 0) {
         commandHistory.addCommand(line);
         tab.autocomplete.addToHistory(line);
@@ -395,73 +344,26 @@ window.addEventListener("keydown", async (event) => {
       tab.currentInput = tab.currentInput.slice(0, -1);
     } else if (key.length === 1) {
       tab.currentInput += key;
-      // Auto-dismiss overlay when user starts typing a new command
-      if (tab.currentInput.length === 1 && overlay.isActive) {
-        overlay.dismiss();
-      }
+      if (tab.currentInput.length === 1 && overlay.isActive) overlay.dismiss();
     }
-
-    // Update autocomplete ghost text
     tab.autocomplete.update(tab.currentInput);
   }
 
-  // Scroll shortcuts (Shift + navigation keys)
+  // Scroll shortcuts
   if (event.shiftKey) {
-    if (key === "PageUp") {
-      event.preventDefault();
-      const scrollEl = tab.grid.getScrollElement();
-      scrollEl.scrollBy({ top: -scrollEl.clientHeight, behavior: "smooth" });
-      return;
-    }
-    if (key === "PageDown") {
-      event.preventDefault();
-      const scrollEl = tab.grid.getScrollElement();
-      scrollEl.scrollBy({ top: scrollEl.clientHeight, behavior: "smooth" });
-      return;
-    }
-    if (key === "Home") {
-      event.preventDefault();
-      tab.grid.getScrollElement().scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    if (key === "End") {
-      event.preventDefault();
-      const scrollEl = tab.grid.getScrollElement();
-      scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: "smooth" });
-      return;
-    }
+    if (key === "PageUp") { event.preventDefault(); const s = tab.grid.getScrollElement(); s.scrollBy({ top: -s.clientHeight, behavior: "smooth" }); return; }
+    if (key === "PageDown") { event.preventDefault(); const s = tab.grid.getScrollElement(); s.scrollBy({ top: s.clientHeight, behavior: "smooth" }); return; }
+    if (key === "Home") { event.preventDefault(); tab.grid.getScrollElement().scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (key === "End") { event.preventDefault(); const s = tab.grid.getScrollElement(); s.scrollTo({ top: s.scrollHeight, behavior: "smooth" }); return; }
   }
 
-  // Font size: Cmd+Plus / Cmd+Minus / Cmd+0 (reset)
-  if (metaKey && (key === "=" || key === "+")) {
-    event.preventDefault();
-    fontManager.incrementSize(1);
-    return;
-  }
-  if (metaKey && key === "-") {
-    event.preventDefault();
-    fontManager.incrementSize(-1);
-    return;
-  }
-  if (metaKey && key === "0") {
-    event.preventDefault();
-    fontManager.setSize(14); // reset to default
-    return;
-  }
-
-  // Alt key routing — if option_as_meta is off, let native handling occur
-  if (event.altKey && !optionAsMeta) {
-    return; // Let browser handle Option key for special characters
-  }
+  // Alt key routing
+  if (event.altKey && !optionAsMeta) return;
 
   const seq = keyToAnsi(event);
   if (seq === null) return;
-
   event.preventDefault();
-  const bytes = Array.from(new TextEncoder().encode(seq));
-  tab.writePty(bytes).catch((err) => {
-    console.error("write_to_session failed:", err);
-  });
+  tab.writePty(Array.from(new TextEncoder().encode(seq))).catch(console.error);
 });
 
 // ─── keyToAnsi ────────────────────────────────────────────────────────────────

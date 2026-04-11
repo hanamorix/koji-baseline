@@ -258,7 +258,7 @@ export async function handleExit(_args: string[]): Promise<{ output: string; isE
 // ─── /version ─────────────────────────────────────────────────────────────────
 
 export async function handleVersion(): Promise<string> {
-  return "Kōji Baseline v0.5.0";
+  return "Kōji Baseline v0.6.0";
 }
 
 // ─── /font ────────────────────────────────────────────────────────────────────

@@ -14,6 +14,8 @@ fn default_cursor_style() -> String { "block".into() }
 fn default_true() -> bool { true }
 fn default_min_duration() -> u64 { 10 }
 fn default_suggest_debounce_ms() -> u64 { 500 }
+fn default_visor_hotkey() -> String { "cmd+`".into() }
+fn default_visor_height() -> u32 { 40 }
 
 fn default_new_tab() -> String { "cmd+t".into() }
 fn default_close_tab() -> String { "cmd+w".into() }
@@ -45,6 +47,8 @@ pub struct KojiConfig {
     pub keybindings: KeybindingConfig,
     #[serde(default)]
     pub ai: AiConfig,
+    #[serde(default)]
+    pub quick_terminal: QuickTerminalConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,6 +189,26 @@ impl Default for AiConfig {
             suggest_debounce_ms: default_suggest_debounce_ms(),
             history_file: true,
             blocks_enabled: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuickTerminalConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_visor_hotkey")]
+    pub hotkey: String,
+    #[serde(default = "default_visor_height")]
+    pub height_percent: u32,
+}
+
+impl Default for QuickTerminalConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            hotkey: "cmd+`".into(),
+            height_percent: 40,
         }
     }
 }

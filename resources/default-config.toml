@@ -56,6 +56,19 @@ history_file = true
 # Enable AI blocks — rich inline panels for errors, diffs, and explanations
 blocks_enabled = true
 
+# ─── Quick Terminal ──────────────────────────────────────────────────────────
+
+[quick_terminal]
+
+# Enable the visor — a dropdown terminal panel toggled by hotkey
+enabled = true
+
+# Hotkey to toggle the visor panel
+hotkey = "cmd+`"
+
+# Visor height as a percentage of the window
+height_percent = 40
+
 # ─── Keybindings ─────────────────────────────────────────────────────────────
 # Format: modifier+key (cmd, ctrl, shift, alt)
 # Examples: "cmd+t", "cmd+shift+p", "ctrl+alt+delete" (jk don't do that)

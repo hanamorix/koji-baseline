@@ -1,0 +1,61 @@
+# Koji Baseline — Configuration
+# Edit this file to customise your terminal. Changes reload automatically.
+# Docs: https://github.com/hanamori/koji-baseline
+
+# ─── Terminal ────────────────────────────────────────────────────────────────
+
+[terminal]
+
+# Color theme name (loaded from themes/ directory)
+theme = "wallace"
+
+# Font family — must be installed on the system
+font = "JetBrains Mono"
+
+# Font size in points
+font_size = 14
+
+# Cursor style: "block", "underline", or "bar"
+cursor_style = "block"
+
+# Copy selected text to clipboard automatically
+copy_on_select = true
+
+# Inject shell integration scripts (OSC 7/133 for zsh/bash/fish)
+shell_integration = true
+
+# Treat Option key as Meta (Alt) — useful for readline bindings
+option_as_meta = true
+
+# ─── Notifications ───────────────────────────────────────────────────────────
+
+[notifications]
+
+# Show desktop notifications when long-running commands finish
+enabled = true
+
+# Minimum command duration (seconds) before a notification fires
+min_duration_seconds = 10
+
+# ─── Keybindings ─────────────────────────────────────────────────────────────
+# Format: modifier+key (cmd, ctrl, shift, alt)
+# Examples: "cmd+t", "cmd+shift+p", "ctrl+alt+delete" (jk don't do that)
+
+[keybindings]
+new_tab = "cmd+t"
+close_tab = "cmd+w"
+next_tab = "cmd+shift+]"
+prev_tab = "cmd+shift+["
+search = "cmd+f"
+clear = "cmd+k"
+palette = "cmd+shift+p"
+zone_up = "cmd+up"
+zone_down = "cmd+down"
+font_up = "cmd+="
+font_down = "cmd+-"
+font_reset = "cmd+0"
+select_all = "cmd+a"
+copy = "cmd+c"
+paste = "cmd+v"
+split_right = "cmd+d"
+split_down = "cmd+shift+d"

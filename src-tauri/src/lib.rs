@@ -1,6 +1,7 @@
 // lib.rs — Koji Baseline entry point
 // v0.6: SessionMap — per-tab PTY with scoped events. Ollama + OpenAI-compat streaming.
 
+pub mod config;
 pub mod monitor;
 pub mod ollama;
 pub mod openai_compat;
@@ -719,6 +720,26 @@ async fn agent_fetch_url(url: String) -> Result<String, String> {
     }
 }
 
+// ─── TOML Config Commands ────────────────────────────────────────────────────
+
+/// Load the full TOML config (terminal + notifications + keybindings).
+#[tauri::command]
+fn load_toml_config() -> config::KojiConfig {
+    config::load()
+}
+
+/// Save the full TOML config to disk.
+#[tauri::command]
+fn save_toml_config(config: config::KojiConfig) -> Result<(), String> {
+    config::save(&config)
+}
+
+/// Return the path to the TOML config file so the frontend can show it / open it.
+#[tauri::command]
+fn get_config_path() -> String {
+    config::config_path().to_string_lossy().to_string()
+}
+
 // ─── App bootstrap ────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -757,8 +778,15 @@ pub fn run() {
             agent_search_files,
             agent_search_filenames,
             agent_fetch_url,
+            load_toml_config,
+            save_toml_config,
+            get_config_path,
         ])
         .setup(|app| {
+            // Ensure TOML config exists (migrates from JSON if needed), then watch for changes
+            let _ = config::ensure_default_config();
+            config::start_watcher(app.handle().clone());
+
             monitor::start_monitor(app.handle().clone());
 
             // Load saved model from config on startup

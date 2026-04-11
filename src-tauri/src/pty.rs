@@ -144,18 +144,10 @@ impl PtyManager {
     /// Locate the shell-integration scripts directory.
     /// Returns None if the user disabled integration via config, or if no scripts found.
     fn shell_integration_dir() -> Option<PathBuf> {
-        // Check config — user can opt out with {"shell_integration": "false"}
-        if let Some(home) = dirs::home_dir() {
-            let config = home.join(".koji-baseline").join("config.json");
-            if config.exists() {
-                if let Ok(data) = std::fs::read_to_string(&config) {
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
-                        if json.get("shell_integration").and_then(|v| v.as_str()) == Some("false") {
-                            return None;
-                        }
-                    }
-                }
-            }
+        // Check TOML config — user can opt out with shell_integration = false
+        let config = crate::config::load();
+        if !config.terminal.shell_integration {
+            return None;
         }
 
         // Dev mode: resources dir next to Cargo.toml

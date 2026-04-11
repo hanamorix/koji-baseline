@@ -12,6 +12,16 @@ import { applyClickableRegions } from "../terminal/clickable";
 import { fontManager } from "../fonts/fonts";
 import { themeManager } from "../themes/manager";
 
+export interface CommandZone {
+  prompt_line: number;
+  input_line: number | null;
+  output_line: number | null;
+  end_line: number | null;
+  exit_code: number | null;
+  start_time: number;
+  end_time: number | null;
+}
+
 export class TabSession {
   readonly id: string;
   readonly grid: DOMGrid;
@@ -27,6 +37,9 @@ export class TabSession {
   private _name = "terminal";
   private _active = false;
   private _started = false;
+  private _cwd = "";
+  private _zones: CommandZone[] = [];
+  private _onCwdChanged?: (path: string) => void;
   currentInput = "";
 
   constructor(id: string, parentContainer: HTMLElement) {
@@ -52,8 +65,14 @@ export class TabSession {
   get name(): string { return this._name; }
   set name(v: string) { this._name = v; }
   get active(): boolean { return this._active; }
+  get cwd(): string { return this._cwd; }
+  get zones(): CommandZone[] { return this._zones; }
 
-  async start(): Promise<void> {
+  onCwdChanged(cb: (path: string) => void): void {
+    this._onCwdChanged = cb;
+  }
+
+  async start(cwd?: string): Promise<void> {
     // Apply current font/cursor/config so new tabs match existing ones
     const font = fontManager.getCurrent();
     const size = fontManager.getSize();
@@ -76,7 +95,7 @@ export class TabSession {
     const { rows, cols } = this.grid.measureGrid();
     this.grid.resize(rows, cols);
 
-    await invoke("create_session", { tabId: this.id, rows, cols });
+    await invoke("create_session", { tabId: this.id, rows, cols, cwd: cwd || null });
     this._started = true;
 
     // Apply current theme to the new session's terminal engine
@@ -104,6 +123,31 @@ export class TabSession {
       this.effects.bell();
     });
     this.unlisteners.push(bellUn);
+
+    // CWD from OSC 7
+    const cwdUn = await listen<{ path: string }>(`cwd-update-${this.id}`, (event) => {
+      this._cwd = event.payload.path;
+      this._onCwdChanged?.(event.payload.path);
+    });
+    this.unlisteners.push(cwdUn);
+
+    // Title from OSC 0/1/2
+    const titleUn = await listen<string>(`title-changed-${this.id}`, (event) => {
+      if (this._active) document.title = event.payload;
+    });
+    this.unlisteners.push(titleUn);
+
+    // Clipboard store from OSC 52
+    const clipUn = await listen<string>(`clipboard-store-${this.id}`, (event) => {
+      navigator.clipboard.writeText(event.payload).catch(console.warn);
+    });
+    this.unlisteners.push(clipUn);
+
+    // Zones from OSC 133
+    const zonesUn = await listen<CommandZone[]>(`zones-update-${this.id}`, (event) => {
+      this._zones = event.payload;
+    });
+    this.unlisteners.push(zonesUn);
 
     // Shell exited — mark tab as dead so user sees it
     const closedUn = await listen(`session-closed-${this.id}`, () => {

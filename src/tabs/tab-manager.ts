@@ -36,6 +36,8 @@ export class TabManager {
     this.tabs.set(id, session);
     this.tabOrder.push(id);
 
+    const currentCwd = this.getActive()?.cwd || "";
+
     const current = this.getActive();
     if (current) current.deactivate();
 
@@ -51,8 +53,15 @@ export class TabManager {
       this.renderTabBar();
     });
 
+    // Update tab name when CWD changes
+    session.onCwdChanged((path) => {
+      const basename = path.split("/").pop() || path;
+      session.name = basename;
+      this.renderTabBar();
+    });
+
     try {
-      await session.start();
+      await session.start(currentCwd || undefined);
       playLinkedAnimation(session.containerEl);
     } catch (err) {
       console.error(`Failed to start tab ${id}:`, err);

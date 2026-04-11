@@ -224,7 +224,7 @@ const secureEl = document.getElementById("secure-input");
 if (secureEl) {
   secureEl.addEventListener("click", async () => {
     const enabled = await invoke<boolean>("toggle_secure_input");
-    secureEl.textContent = enabled ? "🔒" : "🔓";
+    secureEl.textContent = enabled ? "[●]" : "[○]";
     secureEl.classList.toggle("active", enabled);
   });
 }

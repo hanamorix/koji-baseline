@@ -48,7 +48,6 @@ export class TabSession {
 
     this.containerEl = document.createElement("div");
     this.containerEl.className = "tab-panel";
-    this.containerEl.style.display = "none";
     this.containerEl.dataset.tabId = id;
     parentContainer.appendChild(this.containerEl);
 
@@ -188,9 +187,6 @@ export class TabSession {
 
   activate(): void {
     this._active = true;
-    this.containerEl.style.display = "";
-    // Measure after a frame to ensure layout has settled
-    // Only resize the backend session if it's been created (start() completed)
     requestAnimationFrame(() => {
       const { rows, cols } = this.grid.measureGrid();
       this.grid.resize(rows, cols);
@@ -202,9 +198,13 @@ export class TabSession {
 
   deactivate(): void {
     this._active = false;
-    this.containerEl.style.display = "none";
     this.autocomplete.hide();
     if (this.search.isOpen) this.search.close();
+  }
+
+  /** Set pane-level focus state (within a visible tab's split layout) */
+  setFocused(_focused: boolean): void {
+    // PaneLayout manages the .active class on the wrapper element, not here
   }
 
   async writePty(data: number[]): Promise<void> {

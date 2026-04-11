@@ -976,3 +976,18 @@ html, body {
   top: 0; left: 0; right: 0; bottom: 0;
   background: var(--koji-void);
 }
+
+.tab-panel.tab-exited { opacity: 0.6; }
+
+.tab-exit-message {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: var(--koji-faded);
+  font-size: 12px;
+  font-style: italic;
+  pointer-events: none;
+  z-index: 5;
+}

@@ -26,6 +26,7 @@ export class TabSession {
   private clickableTimer: ReturnType<typeof setTimeout> | null = null;
   private _name = "terminal";
   private _active = false;
+  private _started = false;
   currentInput = "";
 
   constructor(id: string, parentContainer: HTMLElement) {
@@ -76,6 +77,7 @@ export class TabSession {
     this.grid.resize(rows, cols);
 
     await invoke("create_session", { tabId: this.id, rows, cols });
+    this._started = true;
 
     // Apply current theme to the new session's terminal engine
     // (set_theme_colors applies to all sessions, including this new one)
@@ -102,16 +104,39 @@ export class TabSession {
       this.effects.bell();
     });
     this.unlisteners.push(bellUn);
+
+    // Shell exited — mark tab as dead so user sees it
+    const closedUn = await listen(`session-closed-${this.id}`, () => {
+      this._started = false;
+      this.containerEl.classList.add("tab-exited");
+      // Show a subtle "[exited]" indicator in the grid area
+      const exitMsg = document.createElement("div");
+      exitMsg.className = "tab-exit-message";
+      exitMsg.textContent = "[process exited — press any key to close]";
+      this.containerEl.appendChild(exitMsg);
+      this._onSessionClosed?.();
+    });
+    this.unlisteners.push(closedUn);
   }
+
+  /** Register a callback when the shell process exits */
+  onSessionClosed(cb: () => void): void {
+    this._onSessionClosed = cb;
+  }
+
+  private _onSessionClosed?: () => void;
 
   activate(): void {
     this._active = true;
     this.containerEl.style.display = "";
     // Measure after a frame to ensure layout has settled
+    // Only resize the backend session if it's been created (start() completed)
     requestAnimationFrame(() => {
       const { rows, cols } = this.grid.measureGrid();
       this.grid.resize(rows, cols);
-      invoke("resize_session", { tabId: this.id, rows, cols }).catch(console.warn);
+      if (this._started) {
+        invoke("resize_session", { tabId: this.id, rows, cols }).catch(console.warn);
+      }
     });
   }
 
@@ -123,12 +148,14 @@ export class TabSession {
   }
 
   async writePty(data: number[]): Promise<void> {
+    if (!this._started) return;
     await invoke("write_to_session", { tabId: this.id, data });
   }
 
   async resize(rows: number, cols: number): Promise<void> {
     this.grid.resize(rows, cols);
-    await invoke("resize_session", { tabId: this.id, rows, cols });
+    if (!this._started) return;
+    await invoke("resize_session", { tabId: this.id, rows, cols }).catch(console.warn);
   }
 
   async close(): Promise<void> {

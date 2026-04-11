@@ -43,7 +43,12 @@ export class SelectionManager {
   async handlePaste(): Promise<void> {
     const text = await navigator.clipboard.readText();
     if (!text) return;
-    const bracketed = BRACKET_OPEN + text + BRACKET_CLOSE;
+
+    // Safety limit: 256KB. Larger pastes risk PTY buffer overflow or frozen UI.
+    const MAX_PASTE = 256 * 1024;
+    const clipped = text.length > MAX_PASTE ? text.slice(0, MAX_PASTE) : text;
+
+    const bracketed = BRACKET_OPEN + clipped + BRACKET_CLOSE;
     const data = Array.from(new TextEncoder().encode(bracketed));
     await this.writeFn(data);
   }

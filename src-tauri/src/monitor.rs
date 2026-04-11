@@ -1,6 +1,6 @@
 // monitor.rs — System stats poller for the Wallace dashboard
 // Polls CPU + memory every second and fires "system-stats" events at the frontend.
-// Task 13: also tracks CWD + git branch/status, emits "cwd-changed".
+// Also tracks CWD + git branch/status, emits "cwd-changed".
 
 use serde::Serialize;
 use sysinfo::System;

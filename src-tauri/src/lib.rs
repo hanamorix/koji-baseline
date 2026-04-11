@@ -1,6 +1,5 @@
 // lib.rs — Koji Baseline entry point
-// v0.6: SessionMap — per-tab PTY with scoped events. No more single-terminal peasantry.
-// Task 8: Ollama client wired in — streaming LLM queries from the terminal.
+// v0.6: SessionMap — per-tab PTY with scoped events. Ollama + OpenAI-compat streaming.
 
 pub mod monitor;
 pub mod ollama;

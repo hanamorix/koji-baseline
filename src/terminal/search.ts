@@ -36,24 +36,31 @@ export class TerminalSearch {
 
     this.barEl = document.createElement("div");
     this.barEl.className = "search-bar";
+    this.barEl.setAttribute("role", "search");
+    this.barEl.setAttribute("aria-label", "Search terminal");
 
     this.inputEl = document.createElement("input");
     this.inputEl.type = "text";
     this.inputEl.placeholder = "Search...";
+    this.inputEl.setAttribute("aria-label", "Search term");
 
     this.countEl = document.createElement("span");
     this.countEl.className = "search-count";
+    this.countEl.setAttribute("aria-live", "polite");
 
     const prevBtn = document.createElement("button");
     prevBtn.textContent = "\u25B2";
+    prevBtn.setAttribute("aria-label", "Previous match");
     prevBtn.addEventListener("click", () => this.navigateMatch(-1));
 
     const nextBtn = document.createElement("button");
     nextBtn.textContent = "\u25BC";
+    nextBtn.setAttribute("aria-label", "Next match");
     nextBtn.addEventListener("click", () => this.navigateMatch(1));
 
     const closeBtn = document.createElement("button");
     closeBtn.textContent = "\u2715";
+    closeBtn.setAttribute("aria-label", "Close search");
     closeBtn.addEventListener("click", () => this.close());
 
     this.barEl.appendChild(this.inputEl);

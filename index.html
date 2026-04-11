@@ -9,38 +9,38 @@
   <div id="app">
 
     <!-- ── Status bar ─────────────────────────────────────────── -->
-    <div class="dashboard-top">
-      <span class="label-icon">◉</span>
-      CPU <span class="value" id="cpu-value">--%</span>
-      <span class="separator">│</span>
-      MEM <span class="value" id="mem-value">--G</span>
-      <span class="separator">│</span>
-      <span class="llm-badge" id="llm-badge" title="Click to set up the AI agent" style="cursor:pointer">
-        <span class="llm-prompt-hint">&gt;&gt;</span>
+    <div class="dashboard-top" role="status" aria-label="System status bar">
+      <span class="label-icon" aria-hidden="true">◉</span>
+      CPU <span class="value" id="cpu-value" aria-label="CPU usage">--%</span>
+      <span class="separator" aria-hidden="true">│</span>
+      MEM <span class="value" id="mem-value" aria-label="Memory usage">--G</span>
+      <span class="separator" aria-hidden="true">│</span>
+      <span class="llm-badge" id="llm-badge" role="button" tabindex="0" aria-label="AI model settings" title="Click to set up the AI agent" style="cursor:pointer">
+        <span class="llm-prompt-hint" aria-hidden="true">&gt;&gt;</span>
         <span class="value" id="llm-model"></span>
-        <span class="llm-dot" id="llm-dot">●</span>
+        <span class="llm-dot" id="llm-dot" aria-hidden="true">●</span>
       </span>
-      <span class="separator">│</span>
-      <span class="era-clock" id="era-clock">--</span>
-      <span class="idle-icon" id="idle-icon"></span>
+      <span class="separator" aria-hidden="true">│</span>
+      <span class="era-clock" id="era-clock" aria-label="Clock">--</span>
+      <span class="idle-icon" id="idle-icon" aria-hidden="true"></span>
     </div>
 
     <!-- ── Tab bar ────────────────────────────────────── -->
-    <div class="terminal-tabbar" id="terminal-tabbar">
+    <div class="terminal-tabbar" id="terminal-tabbar" role="tablist" aria-label="Terminal tabs">
       <div class="tabbar-tabs" id="tabbar-tabs"></div>
-      <button class="tabbar-new" id="tabbar-new" title="New tab (Cmd+T)">+</button>
+      <button class="tabbar-new" id="tabbar-new" title="New tab (Cmd+T)" aria-label="New tab">+</button>
     </div>
 
     <!-- ── Terminal canvas ────────────────────────────────────── -->
-    <div class="terminal-viewport" id="terminal-container">
-      <div class="terminal-overlay" id="terminal-overlay"></div>
+    <div class="terminal-viewport" id="terminal-container" role="main" aria-label="Terminal">
+      <div class="terminal-overlay" id="terminal-overlay" role="log" aria-live="polite"></div>
     </div>
 
     <!-- ── Context bar ────────────────────────────────────────── -->
-    <div class="dashboard-bottom">
-      <span style="color: var(--koji-dim);">▸</span>
+    <div class="dashboard-bottom" role="status" aria-label="Working directory">
+      <span style="color: var(--koji-dim);" aria-hidden="true">▸</span>
       <span class="path" id="cwd-path">~/</span>
-      <span style="color: var(--koji-dim);">on</span>
+      <span style="color: var(--koji-dim);" aria-hidden="true">on</span>
       <span class="branch" id="git-branch">--</span>
       <span class="git-status" id="git-status"></span>
     </div>

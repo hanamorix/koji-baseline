@@ -1,6 +1,5 @@
 // pty.rs — PTY Manager: spawn a shell, pipe I/O like a feral systems engineer
 // no hand-holding, no apologies. just raw bytes and a very patient zsh.
-// Task 14: master handle stored for resize — because windows change shape, deal with it.
 
 use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use std::io::{Read, Write};
@@ -34,11 +33,22 @@ impl PtyManager {
         cmd.arg("-i");
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
-        // Inherit the full user environment so tools like Claude Code,
-        // git, node, python, etc. work normally with all their config.
+        // Inherit user environment but strip sensitive vars that shouldn't leak into shells.
+        // The blocklist covers common credential/token env vars.
+        const SENSITIVE_PREFIXES: &[&str] = &[
+            "AWS_SECRET", "AWS_SESSION_TOKEN",
+            "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+            "GITHUB_TOKEN", "GH_TOKEN",
+            "NPM_TOKEN", "NODE_AUTH_TOKEN",
+            "DOCKER_PASSWORD",
+            "SECRET_", "PRIVATE_KEY",
+        ];
         for (key, value) in std::env::vars() {
-            // Don't override TERM/COLORTERM we just set
-            if key != "TERM" && key != "COLORTERM" {
+            if key == "TERM" || key == "COLORTERM" {
+                continue; // Already set above
+            }
+            let dominated = SENSITIVE_PREFIXES.iter().any(|p| key.starts_with(p));
+            if !dominated {
                 cmd.env(&key, &value);
             }
         }

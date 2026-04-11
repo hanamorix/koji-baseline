@@ -16,7 +16,7 @@ export class TabManager {
     this.tabsContainerEl = document.getElementById("tabbar-tabs")!;
 
     document.getElementById("tabbar-new")!.addEventListener("click", () => {
-      this.createTab();
+      this.createTab().catch((err) => console.error("New tab failed:", err));
     });
   }
 
@@ -41,10 +41,35 @@ export class TabManager {
 
     this.activeTabId = id;
     session.activate();
-    await session.start();
 
-    playLinkedAnimation(session.containerEl);
+    // Render tab bar immediately so the tab is visible before PTY starts
     this.renderTabBar();
+
+    // When the shell process exits, update the tab name
+    session.onSessionClosed(() => {
+      session.name = `${session.name} [exited]`;
+      this.renderTabBar();
+    });
+
+    try {
+      await session.start();
+      playLinkedAnimation(session.containerEl);
+    } catch (err) {
+      console.error(`Failed to start tab ${id}:`, err);
+      // Clean up the broken tab — switch back or create fresh
+      this.tabs.delete(id);
+      this.tabOrder = this.tabOrder.filter((t) => t !== id);
+      session.containerEl.remove();
+      if (this.tabOrder.length > 0) {
+        this.switchTo(this.tabOrder[this.tabOrder.length - 1]);
+      } else {
+        // All tabs dead — shouldn't happen, but recover
+        this.activeTabId = "";
+      }
+      this.renderTabBar();
+      throw err;
+    }
+
     return session;
   }
 
@@ -118,8 +143,12 @@ export class TabManager {
       const session = this.tabs.get(id);
       if (!session) continue;
 
+      const isActive = id === this.activeTabId;
       const tab = document.createElement("div");
-      tab.className = "tabbar-tab" + (id === this.activeTabId ? " active" : "");
+      tab.className = "tabbar-tab" + (isActive ? " active" : "");
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-selected", isActive ? "true" : "false");
+      tab.setAttribute("aria-label", session.name);
 
       const label = document.createElement("span");
       label.className = "tabbar-tab-label";
@@ -129,6 +158,8 @@ export class TabManager {
       const close = document.createElement("span");
       close.className = "tabbar-tab-close";
       close.textContent = "\u00d7";
+      close.setAttribute("role", "button");
+      close.setAttribute("aria-label", `Close ${session.name}`);
       close.addEventListener("click", (e) => { e.stopPropagation(); this.closeTab(id); });
 
       tab.appendChild(label);

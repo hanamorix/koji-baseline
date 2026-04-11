@@ -46,6 +46,8 @@ export class InteractiveMenu {
     // Build DOM
     this.element = document.createElement("div");
     this.element.className = "overlay-menu";
+    this.element.setAttribute("role", "dialog");
+    this.element.setAttribute("aria-label", "Selection menu");
 
     // Filter input row
     const filterRow = document.createElement("div");
@@ -53,11 +55,13 @@ export class InteractiveMenu {
     this.filterInput = document.createElement("input");
     this.filterInput.type = "text";
     this.filterInput.placeholder = "type to filter...";
+    this.filterInput.setAttribute("aria-label", "Filter options");
     filterRow.appendChild(this.filterInput);
     this.element.appendChild(filterRow);
 
     // List container
     this.listElement = document.createElement("div");
+    this.listElement.setAttribute("role", "listbox");
     this.element.appendChild(this.listElement);
 
     // Render initial list
@@ -178,6 +182,8 @@ export class InteractiveMenu {
       const item = this.filteredItems[i];
       const row = document.createElement("div");
       row.className = "menu-item";
+      row.setAttribute("role", "option");
+      row.setAttribute("aria-selected", i === this.highlightIndex ? "true" : "false");
       if (i === this.highlightIndex) row.classList.add("highlighted");
       if (item.active) row.classList.add("active-marker");
 

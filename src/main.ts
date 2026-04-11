@@ -130,8 +130,10 @@ llm.onResponseUpdate((text, done) => {
 // Wire the LLM badge click handler (CSP blocks inline onclick)
 const llmBadge = document.getElementById("llm-badge");
 if (llmBadge) {
-  llmBadge.addEventListener("click", () => {
-    llmOnboarding.run().catch(console.error);
+  const launchOnboarding = () => llmOnboarding.run().catch(console.error);
+  llmBadge.addEventListener("click", launchOnboarding);
+  llmBadge.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); launchOnboarding(); }
   });
 }
 
@@ -189,7 +191,7 @@ window.addEventListener("keydown", async (event) => {
   // ── Tab shortcuts ──────────────────────────────────────────────────────
   if (metaKey && key === "t") {
     event.preventDefault();
-    tabManager.createTab();
+    tabManager.createTab().catch((err) => console.error("Cmd+T tab failed:", err));
     return;
   }
   if (metaKey && key === "w") {

@@ -1169,6 +1169,189 @@ html, body {
   vertical-align: middle;
 }
 
+/* ── Command blocks ──────────────────────────────────────────────────────── */
+
+.cmd-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  border-left: 3px solid var(--koji-dim);
+  border-radius: 2px;
+  z-index: 3;
+  overflow: hidden;
+}
+
+.cmd-block-success { border-left-color: var(--koji-green, #3a6a3a); }
+.cmd-block-error { border-left-color: var(--koji-error); }
+
+.cmd-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8px;
+  height: 18px;
+  font-size: 10px;
+  color: var(--koji-faded);
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.cmd-block-cmd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.cmd-block-exit { margin-left: 8px; font-weight: bold; }
+.cmd-block-success .cmd-block-exit { color: var(--koji-green, #3a6a3a); }
+.cmd-block-error .cmd-block-exit { color: var(--koji-error); }
+
+.cmd-block-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  height: 16px;
+  font-size: 9px;
+  color: var(--koji-faded);
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.cmd-block-duration { color: var(--koji-faded); }
+
+.cmd-block-action {
+  background: transparent;
+  border: 1px solid var(--koji-dim);
+  color: var(--koji-faded);
+  font-size: 9px;
+  padding: 0 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 14px;
+}
+
+.cmd-block-action:hover { color: var(--koji-bright); border-color: var(--koji-warm); }
+
+.cmd-block-collapsed .cmd-block-footer { display: none; }
+
+/* Error assist annotation */
+.error-assist {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  background: rgba(255, 69, 0, 0.08);
+  border: 1px solid var(--koji-error);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--koji-warm);
+  z-index: 6;
+  pointer-events: auto;
+}
+
+.error-assist-text { margin-bottom: 6px; line-height: 1.4; }
+
+.error-assist-fix {
+  font-family: inherit;
+  color: var(--koji-bright);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-bottom: 6px;
+  display: inline-block;
+}
+
+.error-assist-actions { display: flex; gap: 8px; }
+
+.error-assist-btn {
+  background: transparent;
+  border: 1px solid var(--koji-dim);
+  color: var(--koji-faded);
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.error-assist-btn:hover { color: var(--koji-bright); border-color: var(--koji-warm); }
+.error-assist-btn.primary { border-color: var(--koji-orange); color: var(--koji-orange); }
+
+/* AI suggest ghost text */
+.ai-suggest-ghost {
+  color: var(--koji-faded);
+  opacity: 0.5;
+  pointer-events: none;
+  font-style: italic;
+}
+
+.ai-suggest-indicator {
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.6;
+}
+
+/* Semantic search overlay */
+.semantic-search-overlay {
+  position: absolute;
+  bottom: 40px;
+  left: 10%;
+  right: 10%;
+  max-height: 300px;
+  background: var(--koji-void);
+  border: 1px solid var(--koji-deep);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 80;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.semantic-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--koji-deep);
+  color: var(--koji-bright);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.semantic-search-input::placeholder { color: var(--koji-faded); }
+
+.semantic-search-results {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.semantic-search-item {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--koji-warm);
+  font-size: 12px;
+}
+
+.semantic-search-item:hover, .semantic-search-item.highlighted {
+  background: var(--koji-deep);
+  color: var(--koji-bright);
+}
+
+.semantic-search-item-cmd { font-family: inherit; }
+.semantic-search-item-meta { font-size: 10px; color: var(--koji-faded); margin-top: 2px; }
+
 /* Tab layout wrapper */
 .tab-layout-wrapper {
   position: absolute;

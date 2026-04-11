@@ -69,6 +69,9 @@ export class TabSession {
     const copyOnSelect = await invoke<string>("load_config", { key: "copy_on_select" }).catch(() => "");
     if (copyOnSelect === "false") this.selection.setCopyOnSelect(false);
 
+    // Wait a frame for layout to settle before measuring
+    await new Promise((r) => requestAnimationFrame(r));
+
     const { rows, cols } = this.grid.measureGrid();
     this.grid.resize(rows, cols);
 
@@ -104,9 +107,12 @@ export class TabSession {
   activate(): void {
     this._active = true;
     this.containerEl.style.display = "";
-    const { rows, cols } = this.grid.measureGrid();
-    this.grid.resize(rows, cols);
-    invoke("resize_session", { tabId: this.id, rows, cols }).catch(console.warn);
+    // Measure after a frame to ensure layout has settled
+    requestAnimationFrame(() => {
+      const { rows, cols } = this.grid.measureGrid();
+      this.grid.resize(rows, cols);
+      invoke("resize_session", { tabId: this.id, rows, cols }).catch(console.warn);
+    });
   }
 
   deactivate(): void {

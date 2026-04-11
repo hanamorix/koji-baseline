@@ -28,6 +28,7 @@ function normalizeKey(key: string): string {
     "up": "arrowup", "down": "arrowdown", "left": "arrowleft", "right": "arrowright",
     "=": "=", "+": "=", "-": "-", "0": "0",
     "]": "]", "[": "[",
+    "enter": "enter",
   };
   return map[key] ?? key;
 }

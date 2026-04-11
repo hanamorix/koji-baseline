@@ -80,6 +80,14 @@ keybindings.register("copy", "cmd+c", () => {
 keybindings.register("font_up", "cmd+=", () => fontManager.incrementSize(1));
 keybindings.register("font_down", "cmd+-", () => fontManager.incrementSize(-1));
 keybindings.register("font_reset", "cmd+0", () => fontManager.setSize(14));
+keybindings.register("split_right", "cmd+d", () => { tabManager.splitActivePane("horizontal").catch(console.error); });
+keybindings.register("split_down", "cmd+shift+d", () => { tabManager.splitActivePane("vertical").catch(console.error); });
+keybindings.register("close_pane", "cmd+shift+w", () => tabManager.closeActivePane());
+keybindings.register("pane_left", "cmd+option+left", () => tabManager.focusPaneDirection("left"));
+keybindings.register("pane_right", "cmd+option+right", () => tabManager.focusPaneDirection("right"));
+keybindings.register("pane_up", "cmd+option+up", () => tabManager.focusPaneDirection("up"));
+keybindings.register("pane_down", "cmd+option+down", () => tabManager.focusPaneDirection("down"));
+keybindings.register("pane_zoom", "cmd+shift+enter", () => tabManager.togglePaneZoom());
 
 // Load TOML config and update keybindings
 invoke("load_toml_config").then((config: unknown) => {
@@ -96,11 +104,14 @@ listen("config-changed", (event: any) => {
 
 // ── Font system — route to active tab ────────────────────────────────────
 fontManager.setChangeCallback((font, size, ligatures) => {
-  const tab = tabManager.getActive();
-  if (!tab) return;
-  tab.grid.setFont(font, size, ligatures);
-  const { rows, cols } = tab.grid.measureGrid();
-  tab.resize(rows, cols);
+  for (const session of tabManager.getAllTabs()) {
+    session.grid.setFont(font, size, ligatures);
+  }
+  const active = tabManager.getActive();
+  if (active) {
+    const { rows, cols } = active.grid.measureGrid();
+    active.resize(rows, cols);
+  }
 });
 
 // Load saved font preference
@@ -227,10 +238,12 @@ let resizeTimer: number | null = null;
 new ResizeObserver(() => {
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => {
-    const tab = tabManager.getActive();
-    if (!tab) return;
-    const { rows, cols } = tab.grid.measureGrid();
-    tab.resize(rows, cols);
+    for (const session of tabManager.getAllTabs()) {
+      if (session.active) {
+        const { rows, cols } = session.grid.measureGrid();
+        session.resize(rows, cols);
+      }
+    }
   }, 50);
 }).observe(container);
 

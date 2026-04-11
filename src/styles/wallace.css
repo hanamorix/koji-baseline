@@ -1124,3 +1124,53 @@ html, body {
 }
 
 .pane-divider:hover { background: var(--koji-warm); }
+
+/* Tab drag */
+.tab-drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  opacity: 0.7;
+  z-index: 200;
+}
+
+.tab-drop-indicator {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background: var(--koji-orange);
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* Proxy icon */
+.proxy-path {
+  color: var(--koji-faded);
+  font-size: 10px;
+  margin-left: auto;
+  padding-right: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.proxy-path:hover { color: var(--koji-warm); }
+
+/* Pane count badge */
+.tabbar-pane-count {
+  display: inline-block;
+  background: var(--koji-deep);
+  color: var(--koji-faded);
+  font-size: 9px;
+  padding: 0 4px;
+  border-radius: 3px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Tab layout wrapper */
+.tab-layout-wrapper {
+  position: absolute;
+  inset: 0;
+}

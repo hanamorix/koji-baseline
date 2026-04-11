@@ -8,6 +8,8 @@ const SLASH_COMMANDS = [
   "/help", "/version", "/theme", "/font", "/cursor", "/llm",
   "/llm models", "/llm recommend", "/llm autorun off",
   "/llm autorun safe", "/llm autorun full", "/agent", "/exit",
+  "/shell-integration", "/shell-integration on", "/shell-integration off",
+  "/terminfo", "/blocks", "/blocks on", "/blocks off", "/history",
 ];
 
 const PATH_COMMANDS = new Set([

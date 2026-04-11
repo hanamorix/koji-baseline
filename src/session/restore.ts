@@ -69,7 +69,6 @@ export async function restoreSession(tabManager: TabManager): Promise<boolean> {
     // Create tabs with saved CWDs
     // First tab already created by boot sequence — recreate additional tabs
     for (let i = 1; i < session.tabs.length; i++) {
-      // TODO: pass saved CWD to createTab once it supports a cwd parameter
       await tabManager.createTab();
     }
 

@@ -19,6 +19,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 // ─── App State ────────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 struct Session {
     pty: pty::PtyManager,
     engine: terminal::TerminalEngine,

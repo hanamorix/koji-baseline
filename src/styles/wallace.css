@@ -184,6 +184,13 @@ html, body {
   font-size: 11px;
 }
 
+.dashboard-top .idle-icon {
+  color: var(--koji-faded);
+  font-size: 12px;
+  margin-left: 6px;
+  min-width: 14px;
+}
+
 /* ─── Terminal viewport ──────────────────────────────────────────────────────── */
 
 .terminal-viewport {

@@ -4,6 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { overlay } from "../overlay/overlay";
 import { openMenu } from "../overlay/menu";
+import { updateLlmBadge } from "../dashboard/badge";
 
 const RECOMMENDED_MODELS = [
   { name: "qwen2.5:7b",       desc: "Best all-round — fast, small footprint" },
@@ -111,11 +112,7 @@ export class LlmOnboarding {
           await invoke("switch_model", { model: modelName });
           await invoke("save_config", { key: "activeModel", value: modelName });
 
-          // Update dashboard badge
-          const modelEl = document.getElementById("llm-model");
-          const dotEl = document.getElementById("llm-dot");
-          if (modelEl) modelEl.textContent = modelName;
-          if (dotEl) dotEl.style.background = "#cc7a00";
+          updateLlmBadge(modelName);
 
           overlay.showMessage(
             `● Ready!  model: ${modelName}\n\nType >> followed by your question, or /agent for the full agent.`,

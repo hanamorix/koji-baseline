@@ -102,13 +102,14 @@ llm.onResponseUpdate((text, done) => {
   const modelEl = document.getElementById("llm-model");
   const dotEl = document.getElementById("llm-dot");
 
+  const getVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
   // Restore saved model name immediately
   try {
     const saved = await invoke<string>("load_config", { key: "activeModel" });
     if (saved && modelEl) {
       modelEl.textContent = saved;
-      // Also set dot to indicate a model is configured
-      if (dotEl) dotEl.style.background = "#cc7a00";
+      if (dotEl) dotEl.style.background = getVar("--koji-warm");
     }
   } catch { /* no config yet */ }
 
@@ -119,11 +120,10 @@ llm.onResponseUpdate((text, done) => {
       modelEl.textContent = status.model;
     }
     if (dotEl) {
-      dotEl.style.background = status.state === "ready" ? "#cc7a00" : "#3a2a10";
+      dotEl.style.background = status.state === "ready" ? getVar("--koji-warm") : getVar("--koji-deep");
     }
   } catch {
-    // Ollama not running — dim the dot but keep model name if saved
-    if (dotEl && !modelEl?.textContent) dotEl.style.background = "#3a2a10";
+    if (dotEl && !modelEl?.textContent) dotEl.style.background = getVar("--koji-deep");
   }
 }
 

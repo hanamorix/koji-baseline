@@ -3,6 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { updateLlmBadge } from "../dashboard/badge";
 import { commandHistory } from "./context";
 
 // ─── Payload shapes (must mirror Rust structs) ─────────────────────────────────
@@ -57,10 +58,7 @@ export class LlmPanel {
       try {
         await invoke("switch_model", { model: name });
         await invoke("save_config", { key: "activeModel", value: name });
-        const modelEl = document.getElementById("llm-model");
-        const dotEl = document.getElementById("llm-dot");
-        if (modelEl) modelEl.textContent = name;
-        if (dotEl) dotEl.style.background = "#cc7a00";
+        updateLlmBadge(name);
         this.fire(`[llm] Switched to model: ${name}\n`, true);
       } catch (err) {
         this.fire(`[llm] switch_model failed: ${err}\n`, true);
@@ -119,6 +117,7 @@ export class LlmPanel {
   }
 
   private updateDashboard(model: string, state: OllamaStatus["state"]): void {
+    const root = getComputedStyle(document.documentElement);
     const modelEl = document.getElementById("llm-model");
     const dotEl = document.getElementById("llm-dot");
 
@@ -127,11 +126,11 @@ export class LlmPanel {
     if (dotEl) {
       dotEl.className = "llm-dot";
       if (state === "ready") {
-        dotEl.style.background = "#cc7a00"; // amber — online
+        dotEl.style.background = root.getPropertyValue("--koji-warm").trim();
       } else if (state === "generating") {
-        dotEl.style.background = "#ff8c00"; // bright amber — busy
+        dotEl.style.background = root.getPropertyValue("--koji-bright").trim();
       } else {
-        dotEl.style.background = "#3a2a10"; // dim — offline
+        dotEl.style.background = root.getPropertyValue("--koji-deep").trim();
       }
     }
   }

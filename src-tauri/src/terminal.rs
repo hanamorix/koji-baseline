@@ -400,6 +400,11 @@ impl TerminalEngine {
         }
     }
 
+    /// Expose the underlying grid for cursor position queries.
+    pub fn term_grid(&self) -> &alacritty_terminal::grid::Grid<alacritty_terminal::term::cell::Cell> {
+        self.term.grid()
+    }
+
     /// Resize the terminal. Kicks alacritty's reflow logic.
     pub fn resize(&mut self, rows: usize, cols: usize) {
         self.rows = rows;

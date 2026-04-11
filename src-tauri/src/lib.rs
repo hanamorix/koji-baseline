@@ -20,6 +20,7 @@ use tokio::sync::Mutex as AsyncMutex;
 struct Session {
     pty: pty::PtyManager,
     engine: terminal::TerminalEngine,
+    events: Arc<parking_lot::Mutex<Vec<alacritty_terminal::event::Event>>>,
 }
 
 struct SessionMap(Arc<Mutex<HashMap<String, Session>>>);
@@ -36,6 +37,7 @@ fn create_session(
     tab_id: String,
     rows: Option<u16>,
     cols: Option<u16>,
+    cwd: Option<String>,
     sessions: State<'_, SessionMap>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -43,25 +45,32 @@ fn create_session(
     let cols = cols.unwrap_or(80);
 
     // Build the PTY — grab reader Arc BEFORE stashing in the map
+    // TODO: pass cwd to PtyManager::new once Task 4 adds the parameter
+    let _ = &cwd; // suppress unused warning until Task 4
     let manager = pty::PtyManager::new(rows, cols)
         .map_err(|e| format!("Failed to open PTY: {e}"))?;
     let reader_arc = manager.take_reader();
 
     // Build the TerminalEngine
-    let (engine, _event_buf) = terminal::TerminalEngine::new(rows as usize, cols as usize);
+    let (engine, events_queue) = terminal::TerminalEngine::new(rows as usize, cols as usize);
 
     // Insert session into the map
     {
         let mut map = sessions.0.lock();
-        map.insert(tab_id.clone(), Session { pty: manager, engine });
+        map.insert(tab_id.clone(), Session {
+            pty: manager,
+            engine,
+            events: events_queue.clone(),
+        });
     }
 
     // Clone what the I/O thread needs — Arc for the map, not a lock
     let sessions_arc = Arc::clone(&sessions.0);
     let thread_tab_id = tab_id.clone();
     let app_handle = app.clone();
+    let events_arc = events_queue;
 
-    // I/O thread: PTY bytes → engine → emit scoped events
+    // I/O thread: PTY bytes → OSC scan → engine → emit scoped events
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
         // Pre-compute event names to avoid allocation in the hot loop
@@ -69,6 +78,10 @@ fn create_session(
         let ev_scrollback = format!("scrollback-append-{}", thread_tab_id);
         let ev_bell = format!("terminal-bell-{}", thread_tab_id);
         let ev_closed = format!("session-closed-{}", thread_tab_id);
+        let ev_cwd = format!("cwd-update-{}", thread_tab_id);
+        let ev_title = format!("title-changed-{}", thread_tab_id);
+        let ev_clipboard = format!("clipboard-store-{}", thread_tab_id);
+        let ev_zones = format!("zones-update-{}", thread_tab_id);
         loop {
             // Read from PTY — NO SessionMap lock held (this can block)
             let n = {
@@ -79,21 +92,73 @@ fn create_session(
                 }
             };
 
-            let has_bell = terminal::TerminalEngine::check_bell(&buf[..n]);
+            // Scan for OSC 7/133 before alacritty processes the bytes
+            let osc_events = osc::scan_osc(&buf[..n]);
 
-            // Lock SessionMap briefly to process bytes and snapshot
-            let (scrollback, snap) = {
+            // Compute timestamp for zone tracking
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+
+            // Lock SessionMap briefly to process bytes, apply OSC, and snapshot
+            let (scrollback, snap, zones_changed, new_cwd) = {
                 let mut map = sessions_arc.lock();
                 match map.get_mut(&thread_tab_id) {
                     Some(session) => {
+                        let prev_zone_count = session.engine.zones.len();
+                        let prev_cwd = session.engine.cwd.clone();
+
+                        // Get cursor position for zone line tracking
+                        let cursor_line = {
+                            let grid = session.engine.term_grid();
+                            grid.cursor.point.line.0.max(0) as usize
+                        };
+
+                        session.engine.apply_osc_events(&osc_events, cursor_line, now_ms);
                         session.engine.process_bytes(&buf[..n]);
+
                         let sb = session.engine.drain_scrollback();
                         let s = session.engine.snapshot();
-                        (sb, Some(s))
+
+                        let zones_changed = session.engine.zones.len() != prev_zone_count
+                            || session.engine.zones.last().map(|z| z.end_line.is_some()).unwrap_or(false);
+                        let new_cwd = if session.engine.cwd != prev_cwd {
+                            session.engine.cwd.clone()
+                        } else {
+                            None
+                        };
+                        (sb, Some(s), zones_changed, new_cwd)
                     }
                     None => break, // Session was closed externally
                 }
             }; // Lock released here
+
+            // Drain alacritty events (Title, Clipboard, Bell, PtyWrite)
+            {
+                let mut events = events_arc.lock();
+                for event in events.drain(..) {
+                    match event {
+                        alacritty_terminal::event::Event::Title(title) => {
+                            let _ = app_handle.emit(&ev_title, &title);
+                        }
+                        alacritty_terminal::event::Event::ClipboardStore(_, text) => {
+                            let _ = app_handle.emit(&ev_clipboard, &text);
+                        }
+                        alacritty_terminal::event::Event::Bell => {
+                            let _ = app_handle.emit(&ev_bell, ());
+                        }
+                        alacritty_terminal::event::Event::PtyWrite(text) => {
+                            // Write response sequences back to PTY
+                            let map = sessions_arc.lock();
+                            if let Some(session) = map.get(&thread_tab_id) {
+                                let _ = session.pty.write(text.as_bytes());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
 
             // Emit events (no lock held)
             if !scrollback.is_empty() {
@@ -102,8 +167,14 @@ fn create_session(
             if let Some(snap) = snap {
                 let _ = app_handle.emit(&ev_output, &snap);
             }
-            if has_bell {
-                let _ = app_handle.emit(&ev_bell, ());
+            if let Some(cwd) = new_cwd {
+                let _ = app_handle.emit(&ev_cwd, serde_json::json!({ "path": cwd }));
+            }
+            if zones_changed {
+                let map = sessions_arc.lock();
+                if let Some(session) = map.get(&thread_tab_id) {
+                    let _ = app_handle.emit(&ev_zones, &session.engine.zones);
+                }
             }
         }
 

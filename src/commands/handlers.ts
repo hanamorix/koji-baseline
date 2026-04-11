@@ -335,6 +335,20 @@ export async function handleCursor(args: string): Promise<DispatchResult> {
         const { domGrid } = await import("../main");
         domGrid.setCursorStyle(value as "block" | "beam" | "underline");
       },
+      onPreview: (value: string) => {
+        import("../main").then(({ domGrid }) => {
+          domGrid.setCursorStyle(value as "block" | "beam" | "underline");
+        }).catch(() => {});
+      },
+      onCancel: () => {
+        // Restore saved cursor style
+        invoke("load_config", { key: "cursor_style" }).then((saved: unknown) => {
+          const style = (saved as string) || "block";
+          import("../main").then(({ domGrid }) => {
+            domGrid.setCursorStyle(style as "block" | "beam" | "underline");
+          }).catch(() => {});
+        }).catch(() => {});
+      },
     };
     return result;
   }

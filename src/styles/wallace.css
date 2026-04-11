@@ -705,10 +705,11 @@ html, body {
   background: var(--koji-panel, rgba(15, 15, 15, 0.96));
   border: 1px solid var(--koji-dim);
   border-radius: 4px;
-  max-height: 200px;
+  max-height: 240px;
   overflow-y: auto;
-  min-width: 200px;
-  max-width: 400px;
+  min-width: 250px;
+  max-width: 600px;
+  width: max-content;
   display: none;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
@@ -738,8 +739,6 @@ html, body {
 .suggest-label {
   color: var(--koji-warm);
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

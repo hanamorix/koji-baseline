@@ -20,6 +20,7 @@ export async function handleHelp(): Promise<MenuResult> {
     { label: "/agent",            value: "agent",     description: "Open agent split-pane" },
     { label: "/exit",             value: "exit",      description: "Close agent split-pane" },
     { label: "/version",          value: "version",   description: "Print version" },
+    { label: "/shell-integration", value: "shell-integration", description: "Toggle shell integration (OSC 7/133)" },
     { label: "/llm autorun",      value: "autorun",   description: "Set agent tool approval level" },
     { label: "/llm recommend",    value: "recommend", description: "Show recommended models" },
     { label: "/llm models",       value: "models",    description: "Open interactive model picker" },
@@ -41,6 +42,7 @@ export async function handleHelp(): Promise<MenuResult> {
           case "agent":    return handleAgent([]);
           case "exit":     return handleExit([]);
           case "version":  return handleVersion().then((o) => ({ output: o, isError: false }));
+          case "shell-integration": return handleShellIntegration("");
           case "autorun":  return { output: "Usage: /llm autorun off|safe|full", isError: false };
           case "recommend": return handleLlm(["recommend"]);
           case "models":   return handleLlm(["models"]);
@@ -361,4 +363,24 @@ export async function handleCursor(args: string): Promise<DispatchResult> {
   }
 
   return { output: "Usage: /cursor block|beam|underline", isError: true };
+}
+
+// ─── /shell-integration ──────────────────────────────────────────────────────
+
+export async function handleShellIntegration(args: string): Promise<{ output: string; isError: boolean }> {
+  const arg = args.trim().toLowerCase();
+
+  if (arg === "on") {
+    await invoke("save_config", { key: "shell_integration", value: "true" });
+    return { output: "Shell integration enabled. New tabs will inject OSC 7/133 hooks.", isError: false };
+  }
+
+  if (arg === "off") {
+    await invoke("save_config", { key: "shell_integration", value: "false" });
+    return { output: "Shell integration disabled. New tabs will not inject hooks.", isError: false };
+  }
+
+  const current = await invoke<string>("load_config", { key: "shell_integration" }).catch(() => "");
+  const status = current === "false" ? "off" : "on (default)";
+  return { output: `Shell integration: ${status}\nUsage: /shell-integration [on|off]`, isError: false };
 }

@@ -26,6 +26,8 @@ export async function handleHelp(): Promise<MenuResult> {
     { label: "/llm models",       value: "models",    description: "Open interactive model picker" },
     { label: "/llm model <name>", value: "model",     description: "Hot-swap the active LLM model" },
     { label: "/llm pull <name>",  value: "pull",      description: "Pull a model from Ollama registry" },
+    { label: "/blocks",            value: "blocks",    description: "Toggle command block rendering" },
+    { label: "/history",           value: "history",   description: "Search command history (Ctrl+R)" },
     { label: "/terminfo",          value: "terminfo",  description: "Show TERM value and tmux/ssh tips" },
     { label: ">> question",       value: "query",     description: "Ask the LLM inline" },
   ];
@@ -49,6 +51,8 @@ export async function handleHelp(): Promise<MenuResult> {
           case "models":   return handleLlm(["models"]);
           case "model":    return { output: "Usage: /llm model <name>", isError: false };
           case "pull":     return { output: "Usage: /llm pull <name>", isError: false };
+          case "blocks":   return handleBlocks("");
+          case "history":  return handleHistory();
           case "terminfo": { const r = await handleTerminfo(); return r; }
           case "query":    return { output: "Type >> followed by your question and press Enter.", isError: false };
           default:         return { output: "Type /help to see this menu again.", isError: false };
@@ -380,6 +384,39 @@ tmux tip — add to ~/.tmux.conf:
 ssh tip — TERM is forwarded automatically. If colors break:
   export TERM=xterm-256color`;
   return { output, isError: false };
+}
+
+// ─── /shell-integration ──────────────────────────────────────────────────────
+
+// ─── /blocks ─────────────────────────────────────────────────────────────────
+
+export async function handleBlocks(args: string): Promise<DispatchResult> {
+  // Imported dynamically to avoid circular dependency
+  const { tabManager } = await import("../main");
+  const tab = tabManager.getActive();
+  if (!tab) return { output: "No active tab", isError: true };
+
+  const arg = args.trim().toLowerCase();
+  if (arg === "off") {
+    tab.blocks.setEnabled(false);
+    return { output: "Command blocks disabled.", isError: false };
+  }
+  if (arg === "on") {
+    tab.blocks.setEnabled(true);
+    tab.blocks.render(tab.zones, (data) => tab.writePty(data));
+    return { output: "Command blocks enabled.", isError: false };
+  }
+  const status = tab.blocks.isEnabled() ? "on" : "off";
+  return { output: `Command blocks: ${status}\nUsage: /blocks [on|off]`, isError: false };
+}
+
+// ─── /history ────────────────────────────────────────────────────────────────
+
+export async function handleHistory(): Promise<DispatchResult> {
+  const { tabManager } = await import("../main");
+  const tab = tabManager.getActive();
+  if (tab) tab.semanticSearch.open();
+  return { output: "", isError: false };
 }
 
 // ─── /shell-integration ──────────────────────────────────────────────────────

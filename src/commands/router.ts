@@ -1,7 +1,7 @@
 // router.ts — Slash command dispatcher
 // dispatchCommand("/foo bar baz") → Promise<DispatchResult> | null
 
-import { handleHelp, handleTheme, handleLlm, handleVersion, handleAgent, handleExit, handleFont, handleCursor, handleShellIntegration, handleTerminfo } from "./handlers";
+import { handleHelp, handleTheme, handleLlm, handleVersion, handleAgent, handleExit, handleFont, handleCursor, handleShellIntegration, handleTerminfo, handleBlocks, handleHistory } from "./handlers";
 import type { MenuItem } from "../overlay/menu";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -63,6 +63,12 @@ export function dispatchCommand(input: string): Promise<DispatchResult> | null {
 
     case "terminfo":
       return handleTerminfo();
+
+    case "blocks":
+      return handleBlocks(rest.join(" "));
+
+    case "history":
+      return handleHistory();
 
     default:
       // Unknown command — surface a helpful error rather than silent null

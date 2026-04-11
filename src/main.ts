@@ -21,6 +21,7 @@ import { fontManager } from "./fonts/fonts";
 import { TabManager } from "./tabs/tab-manager";
 import { KeybindingManager } from "./config/keybindings";
 import { openPalette, isPaletteOpen } from "./config/palette";
+import { historyDb } from "./terminal/history-db";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,9 @@ container.appendChild(bootCanvas);
 const boot = new BootSequence(bootCanvas);
 await boot.play();
 container.removeChild(bootCanvas);
+
+// ─── Persistent History ─────────────────────────────────────────────────────
+historyDb.load().catch(() => {});
 
 // ─── Tab Manager ─────────────────────────────────────────────────────────────
 export const tabManager = new TabManager(container);
@@ -88,6 +92,10 @@ keybindings.register("pane_right", "cmd+option+right", () => tabManager.focusPan
 keybindings.register("pane_up", "cmd+option+up", () => tabManager.focusPaneDirection("up"));
 keybindings.register("pane_down", "cmd+option+down", () => tabManager.focusPaneDirection("down"));
 keybindings.register("pane_zoom", "cmd+shift+enter", () => tabManager.togglePaneZoom());
+keybindings.register("history_search", "ctrl+r", () => {
+  const tab = tabManager.getActive();
+  tab?.semanticSearch.open();
+});
 
 // Load TOML config and update keybindings
 invoke("load_toml_config").then((config: unknown) => {
@@ -351,6 +359,7 @@ window.addEventListener("keydown", async (event) => {
         commandHistory.addCommand(line);
         tab.autocomplete.addToHistory(line);
         tab.effects.commandSubmit();
+        historyDb.addEntry(line, tab.cwd, 0).catch(() => {}); // exit code filled later by zone
       }
       tab.currentInput = "";
     } else if (key === "Backspace") {

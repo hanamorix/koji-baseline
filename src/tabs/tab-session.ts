@@ -8,6 +8,9 @@ import { SelectionManager } from "../terminal/selection";
 import { Autocomplete } from "../terminal/autocomplete";
 import { TransitionEffects } from "../animation/effects";
 import { TerminalSearch } from "../terminal/search";
+import { BlockRenderer } from "../blocks/block-renderer";
+import { ErrorAssist } from "../blocks/error-assist";
+import { SemanticSearch } from "../terminal/semantic-search";
 import { applyClickableRegions } from "../terminal/clickable";
 import { findNearestZone, scrollToLine } from "../terminal/zones";
 import { fontManager } from "../fonts/fonts";
@@ -31,6 +34,9 @@ export class TabSession {
   readonly effects: TransitionEffects;
   readonly autocomplete: Autocomplete;
   readonly search: TerminalSearch;
+  readonly blocks: BlockRenderer;
+  readonly errorAssist: ErrorAssist;
+  readonly semanticSearch: SemanticSearch;
   readonly containerEl: HTMLDivElement;
 
   private unlisteners: UnlistenFn[] = [];
@@ -60,6 +66,14 @@ export class TabSession {
     this.effects = new TransitionEffects(this.grid.getGridElement());
     this.autocomplete = new Autocomplete(this.grid.getGridElement(), this.grid);
     this.search = new TerminalSearch(this.grid.getGridElement(), this.grid);
+    this.blocks = new BlockRenderer(this.grid);
+    this.errorAssist = new ErrorAssist(this.grid);
+    this.semanticSearch = new SemanticSearch(this.grid.getGridElement(), (cmd) => {
+      // Insert the selected command into the terminal
+      this.currentInput = cmd;
+      const bytes = Array.from(new TextEncoder().encode(cmd));
+      this.writePty(bytes).catch(console.error);
+    });
   }
 
   get name(): string { return this._name; }
@@ -161,6 +175,13 @@ export class TabSession {
     const zonesUn = await listen<CommandZone[]>(`zones-update-${this.id}`, (event) => {
       this._zones = event.payload;
       this.renderZoneIndicators();
+      this.blocks.render(this._zones, (data) => this.writePty(data));
+
+      // Check latest zone for error diagnosis
+      const latest = this._zones[this._zones.length - 1];
+      if (latest?.end_line !== null && latest?.exit_code !== null && latest.exit_code !== 0) {
+        this.errorAssist.checkZone(latest, this._cwd, (data) => this.writePty(data)).catch(console.warn);
+      }
     });
     this.unlisteners.push(zonesUn);
 

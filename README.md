@@ -67,6 +67,16 @@ If you're a developer who lives in the terminal and wants AI assistance without 
 
 Download the latest `.dmg` from [Releases](https://github.com/hanamorix/koji-baseline/releases), open it, drag Koji Baseline to Applications.
 
+#### "Kōji Baseline is damaged and can't be opened"
+
+Kōji is not (yet) signed with an Apple Developer ID, so macOS Gatekeeper attaches a quarantine flag to the download and refuses to launch it with that misleading message. The app is fine — strip the flag once and you're good:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Kōji Baseline.app"
+```
+
+Then double-click as normal. You only need to run this once per install.
+
 ### From Source
 
 Requires: Node.js 18+, Rust 1.75+, macOS 14+ (Sonoma or later)

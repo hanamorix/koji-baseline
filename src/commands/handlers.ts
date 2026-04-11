@@ -26,6 +26,7 @@ export async function handleHelp(): Promise<MenuResult> {
     { label: "/llm models",       value: "models",    description: "Open interactive model picker" },
     { label: "/llm model <name>", value: "model",     description: "Hot-swap the active LLM model" },
     { label: "/llm pull <name>",  value: "pull",      description: "Pull a model from Ollama registry" },
+    { label: "/terminfo",          value: "terminfo",  description: "Show TERM value and tmux/ssh tips" },
     { label: ">> question",       value: "query",     description: "Ask the LLM inline" },
   ];
 
@@ -48,6 +49,7 @@ export async function handleHelp(): Promise<MenuResult> {
           case "models":   return handleLlm(["models"]);
           case "model":    return { output: "Usage: /llm model <name>", isError: false };
           case "pull":     return { output: "Usage: /llm pull <name>", isError: false };
+          case "terminfo": { const r = await handleTerminfo(); return r; }
           case "query":    return { output: "Type >> followed by your question and press Enter.", isError: false };
           default:         return { output: "Type /help to see this menu again.", isError: false };
         }
@@ -363,6 +365,21 @@ export async function handleCursor(args: string): Promise<DispatchResult> {
   }
 
   return { output: "Usage: /cursor block|beam|underline", isError: true };
+}
+
+// ─── /terminfo ───────────────────────────────────────────────────────────────
+
+export async function handleTerminfo(): Promise<DispatchResult> {
+  const output = `TERM: xterm-256color
+COLORTERM: truecolor
+
+tmux tip — add to ~/.tmux.conf:
+  set -g default-terminal "tmux-256color"
+  set -ga terminal-overrides ",xterm-256color:Tc"
+
+ssh tip — TERM is forwarded automatically. If colors break:
+  export TERM=xterm-256color`;
+  return { output, isError: false };
 }
 
 // ─── /shell-integration ──────────────────────────────────────────────────────

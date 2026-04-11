@@ -7,6 +7,7 @@ pub mod ollama;
 pub mod openai_compat;
 pub mod pty;
 pub mod osc;
+pub mod session_restore;
 pub mod terminal;
 
 use std::collections::HashMap;
@@ -735,6 +736,59 @@ async fn agent_fetch_url(url: String) -> Result<String, String> {
     }
 }
 
+// ─── Secure Keyboard Entry ──────────────────────────────────────────────────
+
+#[cfg(target_os = "macos")]
+#[link(name = "Carbon", kind = "framework")]
+extern "C" {
+    fn EnableSecureEventInput();
+    fn DisableSecureEventInput();
+    fn IsSecureEventInputEnabled() -> u8;
+}
+
+#[tauri::command]
+fn toggle_secure_input() -> bool {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        if IsSecureEventInputEnabled() != 0 {
+            DisableSecureEventInput();
+            return false;
+        } else {
+            EnableSecureEventInput();
+            return true;
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    false
+}
+
+#[tauri::command]
+fn is_secure_input() -> bool {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        return IsSecureEventInputEnabled() != 0;
+    }
+    #[cfg(not(target_os = "macos"))]
+    false
+}
+
+// ─── Session Restore Commands ───────────────────────────────────────────────
+
+#[tauri::command]
+fn save_session(session: session_restore::SavedSession) -> Result<(), String> {
+    session_restore::save(&session)
+}
+
+#[tauri::command]
+fn load_saved_session() -> Option<session_restore::SavedSession> {
+    session_restore::load()
+}
+
+#[tauri::command]
+fn clear_saved_session() {
+    session_restore::clear();
+}
+
 // ─── TOML Config Commands ────────────────────────────────────────────────────
 
 /// Load the full TOML config (terminal + notifications + keybindings).
@@ -796,6 +850,11 @@ pub fn run() {
             load_toml_config,
             save_toml_config,
             get_config_path,
+            toggle_secure_input,
+            is_secure_input,
+            save_session,
+            load_saved_session,
+            clear_saved_session,
         ])
         .setup(|app| {
             // Ensure TOML config exists (migrates from JSON if needed), then watch for changes

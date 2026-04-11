@@ -65,14 +65,14 @@ If you're a developer who lives in the terminal and wants AI assistance without 
 
 ### From DMG
 
-Download the latest `.dmg` from [Releases](https://github.com/hanamori/koji-baseline/releases), open it, drag Koji Baseline to Applications.
+Download the latest `.dmg` from [Releases](https://github.com/hanamorix/koji-baseline/releases), open it, drag Koji Baseline to Applications.
 
 ### From Source
 
 Requires: Node.js 18+, Rust 1.75+, macOS 14+ (Sonoma or later)
 
 ```bash
-git clone https://github.com/hanamori/koji-baseline.git
+git clone https://github.com/hanamorix/koji-baseline.git
 cd koji-baseline
 npm install
 npx tauri build
@@ -227,7 +227,7 @@ resources/
 
 ## About
 
-Koji Baseline is a solo project by [Hana Mori](https://github.com/hanamori). Built because every terminal I tried was missing something — and I figured if I'm going to live in the terminal, it should feel like home.
+Koji Baseline is a solo project by [Hana Mori](https://github.com/hanamorix). Built because every terminal I tried was missing something — and I figured if I'm going to live in the terminal, it should feel like home.
 
 The name comes from the Japanese fermentation starter used to make miso, sake, and soy sauce. Koji transforms raw ingredients into something richer. That's the idea — take raw terminal I/O and transform it into something you actually enjoy using.
 

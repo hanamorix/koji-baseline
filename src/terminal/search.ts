@@ -64,7 +64,11 @@ export class TerminalSearch {
     this.container.appendChild(this.barEl);
     this._isOpen = true;
 
-    this.inputEl.addEventListener("input", () => this.performSearch());
+    let searchDebounce: ReturnType<typeof setTimeout> | null = null;
+    this.inputEl.addEventListener("input", () => {
+      if (searchDebounce) clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(() => this.performSearch(), 150);
+    });
 
     this.keyHandler = (e: KeyboardEvent) => {
       if (!this._isOpen) return;

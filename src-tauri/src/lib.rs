@@ -29,18 +29,7 @@ struct OpenAICompatState(Arc<AsyncMutex<openai_compat::OpenAICompatClient>>);
 
 // ─── Session Commands ─────────────────────────────────────────────────────────
 
-/// Generate a unique tab ID from timestamp + random suffix — no uuid crate needed.
-fn generate_tab_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let rand_suffix: u32 = (ts as u32).wrapping_mul(2654435761); // Knuth multiplicative hash
-    format!("tab-{ts}-{rand_suffix:08x}")
-}
-
-/// Create a new terminal session — PTY + engine + I/O thread — keyed by a unique tab ID.
+/// Create a new terminal session — PTY + engine + I/O thread — keyed by the provided tab ID.
 /// Returns the tab ID so the frontend can scope all subsequent calls.
 #[tauri::command]
 fn create_session(
@@ -75,6 +64,11 @@ fn create_session(
     // I/O thread: PTY bytes → engine → emit scoped events
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
+        // Pre-compute event names to avoid allocation in the hot loop
+        let ev_output = format!("terminal-output-{}", thread_tab_id);
+        let ev_scrollback = format!("scrollback-append-{}", thread_tab_id);
+        let ev_bell = format!("terminal-bell-{}", thread_tab_id);
+        let ev_closed = format!("session-closed-{}", thread_tab_id);
         loop {
             // Read from PTY — NO SessionMap lock held (this can block)
             let n = {
@@ -103,22 +97,13 @@ fn create_session(
 
             // Emit events (no lock held)
             if !scrollback.is_empty() {
-                let _ = app_handle.emit(
-                    &format!("scrollback-append-{}", thread_tab_id),
-                    &scrollback,
-                );
+                let _ = app_handle.emit(&ev_scrollback, &scrollback);
             }
             if let Some(snap) = snap {
-                let _ = app_handle.emit(
-                    &format!("terminal-output-{}", thread_tab_id),
-                    &snap,
-                );
+                let _ = app_handle.emit(&ev_output, &snap);
             }
             if has_bell {
-                let _ = app_handle.emit(
-                    &format!("terminal-bell-{}", thread_tab_id),
-                    (),
-                );
+                let _ = app_handle.emit(&ev_bell, ());
             }
         }
 
@@ -127,10 +112,7 @@ fn create_session(
             let mut map = sessions_arc.lock();
             map.remove(&thread_tab_id);
         }
-        let _ = app_handle.emit(
-            &format!("session-closed-{}", thread_tab_id),
-            (),
-        );
+        let _ = app_handle.emit(&ev_closed, ());
     });
 
     Ok(tab_id)
@@ -587,11 +569,6 @@ fn agent_search_files(
     } else {
         Ok(result)
     }
-}
-
-/// Minimal shell escaping — wraps in single quotes and escapes internal single quotes.
-fn shell_escape(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
 }
 
 /// Search for files by name pattern using `find`.

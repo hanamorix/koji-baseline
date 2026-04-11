@@ -1,5 +1,5 @@
 // overlay.ts — DOM overlay manager
-// Replaces Canvas-painted setLlmResponse(). Content renders as HTML over the terminal.
+// Renders messages, LLM responses (with markdown), and menus over the terminal grid.
 
 import { renderMarkdown } from "../agent/markdown";
 

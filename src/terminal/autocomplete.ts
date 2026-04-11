@@ -45,7 +45,14 @@ export class Autocomplete {
     this.dropdownEl = document.createElement("div");
     this.dropdownEl.className = "suggest-dropdown";
     container.appendChild(this.dropdownEl);
+
+    // Cache $HOME once at init
+    invoke<string>("agent_run_command", { command: "echo $HOME" })
+      .then((h) => { this.cachedHome = h.trim(); })
+      .catch(() => {});
   }
+
+  private cachedHome = "";
 
   addToHistory(cmd: string): void {
     if (!cmd.trim()) return;
@@ -281,12 +288,10 @@ export class Autocomplete {
       partial = pathFragment.toLowerCase();
     }
 
-    // Expand ~
+    // Expand ~ using cached $HOME
     if (dir.startsWith("~")) {
-      try {
-        const home = await invoke<string>("agent_run_command", { command: "echo $HOME" });
-        dir = home.trim() + dir.slice(1);
-      } catch { return; }
+      if (!this.cachedHome) return; // Not resolved yet
+      dir = this.cachedHome + dir.slice(1);
     }
 
     if (this.pathQueryId !== queryId) return; // Stale

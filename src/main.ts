@@ -1,9 +1,6 @@
-// main.ts — Koji terminal frontend
-// PTY → engine → event → DOM grid. Keyboard → ANSI → write_to_pty.
-// Task 5:  TabManager replaces global terminal state — all per-tab routing.
-// Task 9:  >> prefix routes to Ollama; commandHistory tracks shell I/O for context.
-// Task 11: ASCII boot sequence.
-// Task 12: Idle animations + transition effects.
+// main.ts — Kōji terminal frontend
+// Multi-tab terminal: TabManager owns per-tab PTY sessions.
+// >> prefix routes to LLM, / prefix routes to slash commands.
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";

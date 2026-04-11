@@ -41,7 +41,4 @@ export function shouldAutoApprove(toolName: string, level: AutorunLevel): boolea
   return !needsApproval(toolName, level);
 }
 
-/** Check if a tool is read-only (safe). */
-export function isToolSafe(toolName: string): boolean {
-  return SAFE_TOOLS.has(toolName);
-}
+// isToolSafe removed — unused, redundant with shouldAutoApprove

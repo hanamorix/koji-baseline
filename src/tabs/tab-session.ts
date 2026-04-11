@@ -9,6 +9,7 @@ import { Autocomplete } from "../terminal/autocomplete";
 import { TransitionEffects } from "../animation/effects";
 import { TerminalSearch } from "../terminal/search";
 import { applyClickableRegions } from "../terminal/clickable";
+import { fontManager } from "../fonts/fonts";
 
 export class TabSession {
   readonly id: string;
@@ -51,6 +52,22 @@ export class TabSession {
   get active(): boolean { return this._active; }
 
   async start(): Promise<void> {
+    // Apply current font/cursor/config so new tabs match existing ones
+    const font = fontManager.getCurrent();
+    const size = fontManager.getSize();
+    const lig = fontManager.getLigatures();
+    this.grid.setFont(font, size, lig);
+
+    // Load cursor style from config
+    const cursorStyle = await invoke<string>("load_config", { key: "cursor_style" }).catch(() => "block") || "block";
+    if (cursorStyle === "beam" || cursorStyle === "underline" || cursorStyle === "block") {
+      this.grid.setCursorStyle(cursorStyle as "block" | "beam" | "underline");
+    }
+
+    // Load copy-on-select preference
+    const copyOnSelect = await invoke<string>("load_config", { key: "copy_on_select" }).catch(() => "");
+    if (copyOnSelect === "false") this.selection.setCopyOnSelect(false);
+
     const { rows, cols } = this.grid.measureGrid();
     this.grid.resize(rows, cols);
 

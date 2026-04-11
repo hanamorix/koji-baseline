@@ -114,6 +114,8 @@ export class DOMGrid {
   private fontSize = 14;
   private ligatures = true;
   private cursorStyle: "block" | "beam" | "underline" = "block";
+  private cachedCharWidth = 0;
+  private cachedLineHeight = 0;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -196,20 +198,17 @@ export class DOMGrid {
   }
 
   getCellFromMouse(event: MouseEvent): { row: number; col: number } | null {
-    for (let r = 0; r < this.viewportRows.length; r++) {
-      const rowEl = this.viewportRows[r].el;
-      const rowRect = rowEl.getBoundingClientRect();
-      if (event.clientY >= rowRect.top && event.clientY < rowRect.bottom) {
-        for (let c = 0; c < rowEl.children.length; c++) {
-          const cellRect = (rowEl.children[c] as HTMLElement).getBoundingClientRect();
-          if (event.clientX >= cellRect.left && event.clientX < cellRect.right) {
-            return { row: r, col: c };
-          }
-        }
-        return { row: r, col: Math.max(0, rowEl.children.length - 1) };
-      }
-    }
-    return null;
+    // Use cached dimensions for arithmetic (avoids DOM queries per-cell)
+    if (this.cachedCharWidth === 0) this.measureGrid(); // ensure cache populated
+    const gridRect = this.gridEl.getBoundingClientRect();
+    const x = event.clientX - gridRect.left;
+    const y = event.clientY - gridRect.top + this.scrollEl.scrollTop;
+
+    const row = Math.floor(y / this.cachedLineHeight) - this.scrollbackRows.length;
+    const col = Math.floor(x / this.cachedCharWidth);
+
+    if (row < 0 || row >= this.viewportRows.length) return null;
+    return { row: Math.max(0, row), col: Math.max(0, col) };
   }
 
   setFont(family: string, size: number, ligatures: boolean): void {
@@ -233,25 +232,26 @@ export class DOMGrid {
     return this.fontSize;
   }
 
-  /** Calculate grid dimensions from container size and current font metrics. */
+  /** Calculate grid dimensions from container size and cached font metrics. */
   measureGrid(): { rows: number; cols: number } {
-    // Create a measuring element to get exact character dimensions
-    const measure = document.createElement("span");
-    measure.className = "cell";
-    measure.style.fontFamily = this.fontFamily;
-    measure.style.fontSize = `${this.fontSize}px`;
-    measure.style.position = "absolute";
-    measure.style.visibility = "hidden";
-    measure.textContent = "W";
-    this.container.appendChild(measure);
-
-    const charWidth = measure.getBoundingClientRect().width;
-    const lineHeight = this.fontSize * 1.3;
-    measure.remove();
+    // Use cached dimensions if available (invalidated by font changes)
+    if (this.cachedCharWidth === 0) {
+      const measure = document.createElement("span");
+      measure.className = "cell";
+      measure.style.fontFamily = this.fontFamily;
+      measure.style.fontSize = `${this.fontSize}px`;
+      measure.style.position = "absolute";
+      measure.style.visibility = "hidden";
+      measure.textContent = "W";
+      this.container.appendChild(measure);
+      this.cachedCharWidth = measure.getBoundingClientRect().width;
+      this.cachedLineHeight = this.fontSize * 1.3;
+      measure.remove();
+    }
 
     const containerRect = this.container.getBoundingClientRect();
-    const cols = Math.floor(containerRect.width / charWidth);
-    const rows = Math.floor(containerRect.height / lineHeight);
+    const cols = Math.floor(containerRect.width / this.cachedCharWidth);
+    const rows = Math.floor(containerRect.height / this.cachedLineHeight);
 
     return { rows: Math.max(1, rows), cols: Math.max(1, cols) };
   }
@@ -259,6 +259,11 @@ export class DOMGrid {
   destroy(): void {
     this.gridEl.remove();
     if (this.scrollbarTimer) clearTimeout(this.scrollbarTimer);
+    // Release large data structures for GC
+    this.scrollbackRows = [];
+    this.viewportRows = [];
+    this.lastSnapshot = null;
+    this.pendingSnapshot = null;
   }
 
   /** Append scrollback rows above the viewport. Called when lines scroll off the top. */
@@ -303,6 +308,9 @@ export class DOMGrid {
     this.scrollEl.style.fontFamily = this.fontFamily;
     this.scrollEl.style.fontSize = `${this.fontSize}px`;
     this.scrollEl.style.fontVariantLigatures = this.ligatures ? "normal" : "none";
+    // Invalidate dimension cache — font change means new char width
+    this.cachedCharWidth = 0;
+    this.cachedLineHeight = 0;
   }
 
   private setupScrollTracking(): void {

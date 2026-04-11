@@ -106,23 +106,12 @@ keybindings.register("visor_toggle", "cmd+`", () => {
 });
 
 // ─── Session save on close ──────────────────────────────────────────────────
-try {
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  getCurrentWindow().onCloseRequested(async (_event) => {
-    // Save session but don't block the close — timeout after 2s
-    try {
-      await Promise.race([
-        saveSession(tabManager),
-        new Promise((_, reject) => setTimeout(() => reject("timeout"), 2000)),
-      ]);
-    } catch {
-      // Save failed or timed out — close anyway
-    }
-    // Don't call event.preventDefault() — let the window close
-  });
-} catch {
-  // Window API not available in dev mode — non-fatal
-}
+// Use beforeunload instead of Tauri's onCloseRequested — the latter intercepts
+// the close event and can prevent the window from closing if the handler hangs.
+window.addEventListener("beforeunload", () => {
+  // Fire-and-forget — don't await, don't block the unload
+  saveSession(tabManager).catch(() => {});
+});
 
 // Load TOML config and update keybindings
 invoke("load_toml_config").then((config: unknown) => {

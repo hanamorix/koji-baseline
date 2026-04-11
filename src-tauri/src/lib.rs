@@ -45,9 +45,7 @@ fn create_session(
     let cols = cols.unwrap_or(80);
 
     // Build the PTY — grab reader Arc BEFORE stashing in the map
-    // TODO: pass cwd to PtyManager::new once Task 4 adds the parameter
-    let _ = &cwd; // suppress unused warning until Task 4
-    let manager = pty::PtyManager::new(rows, cols)
+    let manager = pty::PtyManager::new(rows, cols, cwd.as_deref())
         .map_err(|e| format!("Failed to open PTY: {e}"))?;
     let reader_arc = manager.take_reader();
 

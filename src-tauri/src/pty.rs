@@ -3,6 +3,7 @@
 
 use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 pub struct PtyManager {
@@ -13,7 +14,8 @@ pub struct PtyManager {
 
 impl PtyManager {
     /// Spawn a shell in a fresh PTY. rows/cols configurable, TERM set, slave dropped post-spawn.
-    pub fn new(rows: u16, cols: u16) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    /// Optional cwd sets the initial working directory (tilde-expanded).
+    pub fn new(rows: u16, cols: u16, cwd: Option<&str>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let pty_system = NativePtySystem::default();
 
         let pair = pty_system.openpty(PtySize {
@@ -53,6 +55,54 @@ impl PtyManager {
             }
         }
 
+        // Shell integration injection — OSC 7/133 scripts for zsh/bash/fish
+        if let Some(si_dir) = Self::shell_integration_dir() {
+            let si_str = si_dir.to_string_lossy().to_string();
+            cmd.env("KOJI_SHELL_INTEGRATION", "1");
+            cmd.env("KOJI_SHELL_INTEGRATION_DIR", &si_str);
+            cmd.env("TERM_PROGRAM", "koji-baseline");
+            cmd.env("TERM_PROGRAM_VERSION", env!("CARGO_PKG_VERSION"));
+
+            if shell.ends_with("/zsh") || shell.ends_with("/zsh5") || shell == "zsh" {
+                // Redirect ZDOTDIR so our .zshenv loads first, then chains the real one
+                let orig = std::env::var("ZDOTDIR").unwrap_or_default();
+                cmd.env("KOJI_ORIG_ZDOTDIR", if orig.is_empty() {
+                    std::env::var("HOME").unwrap_or_default()
+                } else {
+                    orig
+                });
+                cmd.env("ZDOTDIR", si_dir.join("zdotdir").to_string_lossy().as_ref());
+            } else if shell.ends_with("/bash") || shell == "bash" {
+                // Bash: add --rcfile so our wrapper sources ~/.bashrc then koji.bash.
+                // -l (already set) coexists fine — it sets login context while --rcfile
+                // overrides which startup file gets sourced.
+                cmd.arg("--rcfile");
+                cmd.arg(si_dir.join("bash-wrapper.sh").to_string_lossy().as_ref());
+            } else if shell.ends_with("/fish") || shell == "fish" {
+                // Fish: prepend our vendor dir so koji.fish auto-loads
+                let xdg = std::env::var("XDG_DATA_DIRS")
+                    .unwrap_or_else(|_| "/usr/local/share:/usr/share".to_string());
+                let fish_vendor = si_dir.join("fish-vendor");
+                cmd.env("XDG_DATA_DIRS", format!("{}:{}", fish_vendor.to_string_lossy(), xdg));
+            }
+        }
+
+        // Set CWD if provided — expand tilde, verify it exists
+        if let Some(dir) = cwd {
+            let expanded = if dir.starts_with("~/") {
+                if let Some(home) = dirs::home_dir() {
+                    home.join(&dir[2..])
+                } else {
+                    PathBuf::from(dir)
+                }
+            } else {
+                PathBuf::from(dir)
+            };
+            if expanded.is_dir() {
+                cmd.cwd(&expanded);
+            }
+        }
+
         // Spawn on the slave side, then nuke the slave handle — master owns the session now
         let _child = pair.slave.spawn_command(cmd)?;
         drop(pair.slave);
@@ -89,5 +139,47 @@ impl PtyManager {
     /// Hand off a clone of the reader Arc — caller spins an I/O thread with this.
     pub fn take_reader(&self) -> Arc<Mutex<Box<dyn Read + Send>>> {
         Arc::clone(&self.master_reader)
+    }
+
+    /// Locate the shell-integration scripts directory.
+    /// Returns None if the user disabled integration via config, or if no scripts found.
+    fn shell_integration_dir() -> Option<PathBuf> {
+        // Check config — user can opt out with {"shell_integration": "false"}
+        if let Some(home) = dirs::home_dir() {
+            let config = home.join(".koji-baseline").join("config.json");
+            if config.exists() {
+                if let Ok(data) = std::fs::read_to_string(&config) {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
+                        if json.get("shell_integration").and_then(|v| v.as_str()) == Some("false") {
+                            return None;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Dev mode: resources dir next to Cargo.toml
+        if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+            let dev = PathBuf::from(manifest)
+                .parent()
+                .map(|p| p.join("resources").join("shell-integration"))
+                .unwrap_or_default();
+            if dev.is_dir() {
+                return Some(dev);
+            }
+        }
+
+        // Production: macOS app bundle — <exe>/../../Resources/shell-integration/
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(bundle) = exe.parent().and_then(|p| p.parent()).map(|p| {
+                p.join("Resources").join("shell-integration")
+            }) {
+                if bundle.is_dir() {
+                    return Some(bundle);
+                }
+            }
+        }
+
+        None
     }
 }

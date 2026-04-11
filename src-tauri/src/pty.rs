@@ -28,6 +28,10 @@ impl PtyManager {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
 
         let mut cmd = CommandBuilder::new(&shell);
+        // Spawn as login + interactive shell so ~/.zshrc, ~/.zprofile, etc. are sourced.
+        // This ensures PATH includes user-installed tools (claude, node, cargo, etc.)
+        cmd.arg("-l");
+        cmd.arg("-i");
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         // Inherit the full user environment so tools like Claude Code,

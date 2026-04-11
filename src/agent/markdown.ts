@@ -121,10 +121,10 @@ function inlineMarkdown(text: string): string {
   result = result.replace(/\*(.+?)\*/g, "<em>$1</em>");
   result = result.replace(/_(.+?)_/g, "<em>$1</em>");
 
-  // Links: [text](url)
+  // Links: [text](url) — only allow http/https schemes
   result = result.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a class="md-link" href="$2" target="_blank">$1</a>'
+    /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+    '<a class="md-link" href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
   );
 
   return result;

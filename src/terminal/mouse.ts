@@ -1,17 +1,19 @@
 // mouse.ts — Terminal mouse reporting with SGR encoding
 
-import { invoke } from "@tauri-apps/api/core";
 import type { DOMGrid } from "./dom-grid";
+import type { WriteFn } from "./selection";
 
 export class MouseReporter {
   private grid: DOMGrid;
   private gridEl: HTMLElement;
   private active = false;
   private lastButton = -1;
+  private writeFn: WriteFn;
 
-  constructor(grid: DOMGrid) {
+  constructor(grid: DOMGrid, writeFn: WriteFn) {
     this.grid = grid;
     this.gridEl = grid.getGridElement();
+    this.writeFn = writeFn;
     this.setupListeners();
   }
 
@@ -77,6 +79,6 @@ export class MouseReporter {
 
     const seq = `\x1b[<${btn};${col + 1};${row + 1}${suffix}`;
     const bytes = Array.from(new TextEncoder().encode(seq));
-    invoke("write_to_pty", { data: bytes }).catch(console.error);
+    this.writeFn(bytes).catch(console.error);
   }
 }

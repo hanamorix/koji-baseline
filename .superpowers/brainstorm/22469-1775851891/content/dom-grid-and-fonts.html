@@ -1,0 +1,169 @@
+<h2>DOM Grid Structure & Font System</h2>
+<p class="subtitle">The core rendering engine and font choices</p>
+
+<div class="section">
+  <h3>DOM Grid Structure</h3>
+  <div class="mockup">
+    <div class="mockup-header">Grid HTML Structure</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 1.7; padding: 20px; color: #ccc;">
+      <div style="color: #666;">&lt;!-- Terminal viewport --&gt;</div>
+      <div>&lt;<span style="color: #ff8c00;">div</span> class="<span style="color: #7ec8e3;">terminal-grid</span>"&gt;</div>
+      <div style="margin-left: 20px;">&lt;<span style="color: #ff8c00;">div</span> class="<span style="color: #7ec8e3;">grid-scroll</span>"&gt; <span style="color: #666;">← scrollback container, overflow-y: auto</span></div>
+      <div style="margin-left: 40px; color: #666;"><!-- scrollback rows (not in viewport) --></div>
+      <div style="margin-left: 40px;">&lt;<span style="color: #ff8c00;">div</span> class="<span style="color: #7ec8e3;">grid-row</span>" data-line="0"&gt;</div>
+      <div style="margin-left: 60px;">&lt;<span style="color: #ff8c00;">span</span> class="<span style="color: #7ec8e3;">cell</span>" style="color:#f0c674;background:#0a0a0a"&gt;$&lt;/span&gt;</div>
+      <div style="margin-left: 60px;">&lt;<span style="color: #ff8c00;">span</span> class="<span style="color: #7ec8e3;">cell</span>"&gt; &lt;/span&gt;</div>
+      <div style="margin-left: 60px;">&lt;<span style="color: #ff8c00;">span</span> class="<span style="color: #7ec8e3;">cell wide</span>"&gt;🔥&lt;/span&gt; <span style="color: #666;">← double-width, spans 2 cols</span></div>
+      <div style="margin-left: 60px; color: #666;">...</div>
+      <div style="margin-left: 40px;">&lt;/div&gt;</div>
+      <div style="margin-left: 40px; color: #666;"><!-- viewport rows (visible) --></div>
+      <div style="margin-left: 40px;">&lt;<span style="color: #ff8c00;">div</span> class="<span style="color: #7ec8e3;">grid-row</span>" data-line="23"&gt;...&lt;/div&gt;</div>
+      <div style="margin-left: 20px;">&lt;/div&gt;</div>
+      <div>&lt;/div&gt;</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Diffing Strategy</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+    <div style="background: rgba(126,200,227,0.08); border: 1px solid rgba(126,200,227,0.25); border-radius: 6px; padding: 16px;">
+      <div style="color: #7ec8e3; font-weight: bold; font-size: 14px; margin-bottom: 8px;">Row-Level Diff</div>
+      <div style="color: #999; font-size: 13px; line-height: 1.5;">
+        Each row gets a content hash (fast string concat of char+fg+bg+flags per cell). On new snapshot, compare hash. <strong style="color: #ccc;">Changed row → rebuild innerHTML.</strong> Unchanged → skip entirely.
+      </div>
+      <div style="color: #666; font-size: 12px; margin-top: 8px;">Typical frame: 2-5 rows change</div>
+    </div>
+    <div style="background: rgba(126,200,227,0.08); border: 1px solid rgba(126,200,227,0.25); border-radius: 6px; padding: 16px;">
+      <div style="color: #7ec8e3; font-weight: bold; font-size: 14px; margin-bottom: 8px;">Cell-Level Cursor</div>
+      <div style="color: #999; font-size: 13px; line-height: 1.5;">
+        Cursor position tracked separately. On move: <strong style="color: #ccc;">remove class from old cell, add to new cell.</strong> Two DOM operations max. Cursor blink via CSS animation — zero JS.
+      </div>
+      <div style="color: #666; font-size: 12px; margin-top: 8px;">60fps blink with 0 RAF cost</div>
+    </div>
+    <div style="background: rgba(126,200,227,0.08); border: 1px solid rgba(126,200,227,0.25); border-radius: 6px; padding: 16px;">
+      <div style="color: #7ec8e3; font-weight: bold; font-size: 14px; margin-bottom: 8px;">Frame Batching</div>
+      <div style="color: #999; font-size: 13px; line-height: 1.5;">
+        During heavy PTY output, multiple snapshots can arrive per frame. <strong style="color: #ccc;">Only render the latest snapshot per rAF.</strong> Drop intermediate frames — user only sees the result.
+      </div>
+      <div style="color: #666; font-size: 12px; margin-top: 8px;">Prevents DOM thrash on `cat bigfile`</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Curated Font Lineup</h3>
+  <p class="subtitle">On-brand, legible, ligature-capable — each fits the Kōji aesthetic</p>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px;">
+
+    <div style="background: rgba(240,198,116,0.08); border: 1px solid rgba(240,198,116,0.3); border-radius: 6px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <strong style="color: #f0c674; font-size: 15px;">JetBrains Mono</strong>
+        <span style="background: rgba(240,198,116,0.2); color: #f0c674; padding: 2px 8px; border-radius: 3px; font-size: 11px;">DEFAULT</span>
+      </div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #ddd; line-height: 1.6; margin-bottom: 12px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 4px;">
+        <div>const fn = () => {</div>
+        <div>&nbsp;&nbsp;return !== undefined;</div>
+        <div>}; // -> => != ===</div>
+        <div style="color: #666;">光路影幻 🔥 ñ ü ö</div>
+      </div>
+      <div style="color: #999; font-size: 12px;">Designed for code. Tall x-height, clear distinction between similar glyphs (0/O, 1/l/I). 138 ligatures. Already bundled.</div>
+    </div>
+
+    <div style="background: rgba(126,200,227,0.08); border: 1px solid rgba(126,200,227,0.25); border-radius: 6px; padding: 20px;">
+      <div style="margin-bottom: 12px;">
+        <strong style="color: #7ec8e3; font-size: 15px;">Fira Code</strong>
+      </div>
+      <div style="font-family: 'Fira Code', monospace; font-size: 14px; color: #ddd; line-height: 1.6; margin-bottom: 12px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 4px;">
+        <div>const fn = () => {</div>
+        <div>&nbsp;&nbsp;return !== undefined;</div>
+        <div>}; // -> => != ===</div>
+        <div style="color: #666;">光路影幻 🔥 ñ ü ö</div>
+      </div>
+      <div style="color: #999; font-size: 12px;">The OG ligature font. Slightly rounder than JetBrains. Extremely popular, battle-tested across every terminal. Warm character that fits the amber Wallace palette.</div>
+    </div>
+
+    <div style="background: rgba(162,136,227,0.08); border: 1px solid rgba(162,136,227,0.25); border-radius: 6px; padding: 20px;">
+      <div style="margin-bottom: 12px;">
+        <strong style="color: #a288e3; font-size: 15px;">Cascadia Code</strong>
+      </div>
+      <div style="font-family: 'Cascadia Code', monospace; font-size: 14px; color: #ddd; line-height: 1.6; margin-bottom: 12px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 4px;">
+        <div>const fn = () => {</div>
+        <div>&nbsp;&nbsp;return !== undefined;</div>
+        <div>}; // -> => != ===</div>
+        <div style="color: #666;">光路影幻 🔥 ñ ü ö</div>
+      </div>
+      <div style="color: #999; font-size: 12px;">Microsoft's terminal font. Clean, modern, slightly more condensed. Ships with Windows Terminal. Cursive italic variant available. Good contrast at small sizes.</div>
+    </div>
+
+    <div style="background: rgba(81,207,102,0.08); border: 1px solid rgba(81,207,102,0.25); border-radius: 6px; padding: 20px;">
+      <div style="margin-bottom: 12px;">
+        <strong style="color: #51cf66; font-size: 15px;">Iosevka</strong>
+      </div>
+      <div style="font-family: 'Iosevka', monospace; font-size: 14px; color: #ddd; line-height: 1.6; margin-bottom: 12px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 4px;">
+        <div>const fn = () => {</div>
+        <div>&nbsp;&nbsp;return !== undefined;</div>
+        <div>}; // -> => != ===</div>
+        <div style="color: #666;">光路影幻 🔥 ñ ü ö</div>
+      </div>
+      <div style="color: #999; font-size: 12px;">Narrow and elegant. Fits more columns in the same width — great for split panes. Highly customizable. Has a sci-fi quality that matches the BR2049 aesthetic perfectly.</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>Font Fallback Chain</h3>
+  <div class="mockup">
+    <div class="mockup-header">CSS font-family resolution order</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 13px; padding: 16px; color: #ccc; line-height: 1.8;">
+      <div><span style="color: #f0c674;">1.</span> Selected font (e.g. 'JetBrains Mono') <span style="color: #666;">— ligatures, Latin, symbols</span></div>
+      <div><span style="color: #f0c674;">2.</span> 'Apple Color Emoji' <span style="color: #666;">— emoji rendering (macOS native)</span></div>
+      <div><span style="color: #f0c674;">3.</span> 'Hiragino Sans', 'Noto Sans CJK SC' <span style="color: #666;">— Japanese/Chinese/Korean</span></div>
+      <div><span style="color: #f0c674;">4.</span> monospace <span style="color: #666;">— system fallback</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Font Controls</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+    <div style="background: rgba(255,255,255,0.04); border: 1px solid #333; border-radius: 6px; padding: 14px;">
+      <div style="color: #f0c674; font-weight: bold; margin-bottom: 6px;">/font</div>
+      <div style="color: #999; font-size: 13px;">Interactive picker menu (same style as /theme). Shows font name + live preview line.</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.04); border: 1px solid #333; border-radius: 6px; padding: 14px;">
+      <div style="color: #f0c674; font-weight: bold; margin-bottom: 6px;">Cmd+/Cmd-</div>
+      <div style="color: #999; font-size: 13px;">Increase/decrease font size by 1px. Range: 10px–24px. Grid recalculates rows/cols.</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.04); border: 1px solid #333; border-radius: 6px; padding: 14px;">
+      <div style="color: #f0c674; font-weight: bold; margin-bottom: 6px;">Ligature Toggle</div>
+      <div style="color: #999; font-size: 13px;">Setting in config. CSS font-variant-ligatures: normal | none. Default: on.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Wide Character Handling</h3>
+  <div class="mockup">
+    <div class="mockup-header">Double-width cell rendering</div>
+    <div class="mockup-body" style="padding: 16px;">
+      <div style="font-family: monospace; font-size: 14px; color: #ccc; line-height: 2;">
+        <div style="margin-bottom: 8px;">
+          <span style="color: #666; font-size: 12px;">Normal cells (1 col each):</span><br>
+          <span style="background: rgba(240,198,116,0.1); border: 1px solid rgba(240,198,116,0.2); padding: 2px 4px; margin: 1px;">h</span><span style="background: rgba(240,198,116,0.1); border: 1px solid rgba(240,198,116,0.2); padding: 2px 4px; margin: 1px;">e</span><span style="background: rgba(240,198,116,0.1); border: 1px solid rgba(240,198,116,0.2); padding: 2px 4px; margin: 1px;">l</span><span style="background: rgba(240,198,116,0.1); border: 1px solid rgba(240,198,116,0.2); padding: 2px 4px; margin: 1px;">l</span><span style="background: rgba(240,198,116,0.1); border: 1px solid rgba(240,198,116,0.2); padding: 2px 4px; margin: 1px;">o</span>
+        </div>
+        <div style="margin-bottom: 8px;">
+          <span style="color: #666; font-size: 12px;">Wide cells (2 cols, one span):</span><br>
+          <span style="background: rgba(126,200,227,0.1); border: 1px solid rgba(126,200,227,0.2); padding: 2px 4px; margin: 1px; display: inline-block; width: 52px; text-align: center;">光</span><span style="background: rgba(126,200,227,0.1); border: 1px solid rgba(126,200,227,0.2); padding: 2px 4px; margin: 1px; display: inline-block; width: 52px; text-align: center;">路</span><span style="background: rgba(126,200,227,0.1); border: 1px solid rgba(126,200,227,0.2); padding: 2px 4px; margin: 1px; display: inline-block; width: 52px; text-align: center;">🔥</span>
+        </div>
+        <div style="color: #999; font-size: 12px;">
+          alacritty_terminal already marks cells as WIDE or WIDE_CHAR_SPACER.<br>
+          WIDE → span with width: 2ch. SPACER → skip (consumed by wide cell).<br>
+          Emoji use the same mechanism. Grid stays aligned.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

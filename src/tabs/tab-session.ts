@@ -35,9 +35,12 @@ export class TabSession {
     this.containerEl.dataset.tabId = id;
     parentContainer.appendChild(this.containerEl);
 
+    // Create a write function that routes to this tab's PTY
+    const writeFn = (data: number[]) => this.writePty(data);
+
     this.grid = new DOMGrid(this.containerEl);
-    this.mouse = new MouseReporter(this.grid);
-    this.selection = new SelectionManager(this.grid.getGridElement());
+    this.mouse = new MouseReporter(this.grid, writeFn);
+    this.selection = new SelectionManager(this.grid.getGridElement(), writeFn);
     this.effects = new TransitionEffects(this.grid.getGridElement());
     this.autocomplete = new Autocomplete(this.grid.getGridElement(), this.grid);
     this.search = new TerminalSearch(this.grid.getGridElement(), this.grid);
@@ -51,7 +54,7 @@ export class TabSession {
     const { rows, cols } = this.grid.measureGrid();
     this.grid.resize(rows, cols);
 
-    await invoke("create_session", { rows, cols });
+    await invoke("create_session", { tabId: this.id, rows, cols });
 
     const outputUn = await listen<GridSnapshot>(`terminal-output-${this.id}`, (event) => {
       this.grid.render(event.payload);
@@ -60,7 +63,7 @@ export class TabSession {
 
       if (this.clickableTimer) clearTimeout(this.clickableTimer);
       this.clickableTimer = setTimeout(() => {
-        applyClickableRegions(this.grid.getScrollElement(), event.payload.mouse_mode).catch(() => {});
+        applyClickableRegions(this.grid.getScrollElement(), event.payload.mouse_mode, (data) => this.writePty(data)).catch(() => {});
       }, 200);
     });
     this.unlisteners.push(outputUn);

@@ -115,6 +115,7 @@ export function findRegionAt(
 export async function applyClickableRegions(
   scrollEl: HTMLElement,
   mouseMode: number,
+  writeFn?: (data: number[]) => Promise<void>,
 ): Promise<void> {
   if (mouseMode > 0) return; // Don't detect when mouse reporting is active
 
@@ -164,10 +165,10 @@ export async function applyClickableRegions(
             invoke("check_path_type", { path: region.value }).then((pathType: unknown) => {
               if (pathType === "file") {
                 invoke("open_file", { path: region.value }).catch(console.error);
-              } else if (pathType === "directory") {
+              } else if (pathType === "directory" && writeFn) {
                 const cmd = `cd ${region.value}\r`;
                 const bytes = Array.from(new TextEncoder().encode(cmd));
-                invoke("write_to_pty", { data: bytes }).catch(console.error);
+                writeFn(bytes).catch(console.error);
               }
             }).catch(() => {});
           }

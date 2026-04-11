@@ -47,14 +47,20 @@ export class TabManager {
     const session = this.tabs.get(id);
     if (!session) return;
 
+    // Remember position before removing
+    const closedIdx = this.tabOrder.indexOf(id);
+
     await session.close();
     this.tabs.delete(id);
     this.tabOrder = this.tabOrder.filter((t) => t !== id);
 
     if (this.activeTabId === id) {
       if (this.tabOrder.length > 0) {
-        this.switchTo(this.tabOrder[Math.max(0, this.tabOrder.length - 1)]);
+        // Switch to nearest neighbor (prefer the one before, or the one that slid into this position)
+        const nearestIdx = Math.min(Math.max(0, closedIdx - 1), this.tabOrder.length - 1);
+        this.switchTo(this.tabOrder[nearestIdx]);
       } else {
+        // Last tab closed — create a new one
         await this.createTab();
         return;
       }

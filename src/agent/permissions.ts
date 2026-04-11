@@ -13,7 +13,7 @@ const SAFE_TOOLS = new Set([
   "search_filenames",
   "git_status",
   "git_diff",
-  "fetch_url",
+  // fetch_url removed — has network side effects (SSRF risk), needs approval
 ]);
 
 /**

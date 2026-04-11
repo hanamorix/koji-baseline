@@ -44,6 +44,7 @@ fn generate_tab_id() -> String {
 /// Returns the tab ID so the frontend can scope all subsequent calls.
 #[tauri::command]
 fn create_session(
+    tab_id: String,
     rows: Option<u16>,
     cols: Option<u16>,
     sessions: State<'_, SessionMap>,
@@ -51,7 +52,6 @@ fn create_session(
 ) -> Result<String, String> {
     let rows = rows.unwrap_or(24);
     let cols = cols.unwrap_or(80);
-    let tab_id = generate_tab_id();
 
     // Build the PTY — grab reader Arc BEFORE stashing in the map
     let manager = pty::PtyManager::new(rows, cols)
@@ -289,8 +289,12 @@ fn check_path_type(path: String) -> Option<String> {
 }
 
 /// Open a URL in the system default browser (macOS `open`).
+/// Only allows http:// and https:// schemes to prevent file:// and other scheme abuse.
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err(format!("Refused to open non-HTTP URL: {url}"));
+    }
     std::process::Command::new("open")
         .arg(&url)
         .spawn()
@@ -331,16 +335,15 @@ fn open_file(path: String) -> Result<(), String> {
 /// Emits "theme-applied-{tab_id}" so the frontend can force a grid redraw.
 #[tauri::command]
 fn set_theme_colors(
-    tab_id: String,
     colors: serde_json::Value,
     sessions: State<'_, SessionMap>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let mut map = sessions.0.lock();
-    if let Some(session) = map.get_mut(&tab_id) {
+    for session in map.values_mut() {
         session.engine.set_theme_colors(&colors);
     }
-    let _ = app.emit(&format!("theme-applied-{}", tab_id), ());
+    let _ = app.emit("theme-applied", ());
     Ok(())
 }
 
@@ -496,16 +499,20 @@ fn agent_list_directory(path: String, recursive: Option<bool>) -> Result<String,
     let recurse = recursive.unwrap_or(false);
 
     if recurse {
-        // Use the shell for simplicity and to respect .gitignore naturally
-        let output = std::process::Command::new("/bin/sh")
-            .arg("-c")
-            .arg(format!(
-                "find {} -not -path '*/\\.*' | sort",
-                expanded.to_string_lossy()
-            ))
+        // Use find with proper argument separation — no shell interpolation
+        let output = std::process::Command::new("find")
+            .arg(&expanded)
+            .arg("-not")
+            .arg("-path")
+            .arg("*/.*")
             .output()
             .map_err(|e| format!("find failed: {e}"))?;
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        let mut lines: Vec<&str> = std::str::from_utf8(&output.stdout)
+            .unwrap_or("")
+            .lines()
+            .collect();
+        lines.sort();
+        Ok(lines.join("\n"))
     } else {
         let entries = std::fs::read_dir(&expanded).map_err(|e| format!("readdir failed: {e}"))?;
         let mut lines: Vec<String> = entries
@@ -560,22 +567,16 @@ fn agent_search_files(
             .output()
             .map_err(|e| format!("rg failed: {e}"))?
     } else {
-        let mut cmd_str = format!(
-            "grep -rn {} {}",
-            shell_escape(&pattern),
-            search_path.to_string_lossy()
-        );
+        let mut grep_args = vec![
+            "-rn".to_string(),
+            pattern.clone(),
+        ];
         if let Some(ref g) = glob {
-            cmd_str = format!(
-                "grep -rn {} --include={} {}",
-                shell_escape(&pattern),
-                shell_escape(g),
-                search_path.to_string_lossy()
-            );
+            grep_args.push(format!("--include={}", g));
         }
-        std::process::Command::new("/bin/sh")
-            .arg("-c")
-            .arg(&cmd_str)
+        grep_args.push(search_path.to_string_lossy().to_string());
+        std::process::Command::new("grep")
+            .args(&grep_args)
             .output()
             .map_err(|e| format!("grep failed: {e}"))?
     };

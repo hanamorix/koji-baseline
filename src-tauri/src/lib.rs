@@ -1,5 +1,5 @@
 // lib.rs — Koji Baseline entry point
-// Task 4: PTY → TerminalEngine → Canvas. I/O thread bridges the gap.
+// v0.6: SessionMap — per-tab PTY with scoped events. No more single-terminal peasantry.
 // Task 8: Ollama client wired in — streaming LLM queries from the terminal.
 
 pub mod monitor;
@@ -8,6 +8,7 @@ pub mod openai_compat;
 pub mod pty;
 pub mod terminal;
 
+use std::collections::HashMap;
 use std::io::Read;
 use std::sync::Arc;
 use parking_lot::Mutex;
@@ -16,27 +17,43 @@ use tokio::sync::Mutex as AsyncMutex;
 
 // ─── App State ────────────────────────────────────────────────────────────────
 
-struct PtyState(Arc<Mutex<Option<pty::PtyManager>>>);
-struct EngineState(Arc<Mutex<Option<terminal::TerminalEngine>>>);
+struct Session {
+    pty: pty::PtyManager,
+    engine: terminal::TerminalEngine,
+}
+
+struct SessionMap(Arc<Mutex<HashMap<String, Session>>>);
+
 struct OllamaState(Arc<AsyncMutex<ollama::OllamaClient>>);
 struct OpenAICompatState(Arc<AsyncMutex<openai_compat::OpenAICompatClient>>);
 
-// ─── PTY Commands ─────────────────────────────────────────────────────────────
+// ─── Session Commands ─────────────────────────────────────────────────────────
 
-/// Spin up a PTY + TerminalEngine, then launch the I/O thread that pumps bytes
-/// from the shell into the engine and fires `terminal-output` events at the frontend.
+/// Generate a unique tab ID from timestamp + random suffix — no uuid crate needed.
+fn generate_tab_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let rand_suffix: u32 = (ts as u32).wrapping_mul(2654435761); // Knuth multiplicative hash
+    format!("tab-{ts}-{rand_suffix:08x}")
+}
+
+/// Create a new terminal session — PTY + engine + I/O thread — keyed by a unique tab ID.
+/// Returns the tab ID so the frontend can scope all subsequent calls.
 #[tauri::command]
-fn init_terminal(
+fn create_session(
     rows: Option<u16>,
     cols: Option<u16>,
-    pty_state: State<'_, PtyState>,
-    engine_state: State<'_, EngineState>,
+    sessions: State<'_, SessionMap>,
     app: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let rows = rows.unwrap_or(24);
     let cols = cols.unwrap_or(80);
+    let tab_id = generate_tab_id();
 
-    // Build the PTY — grab reader Arc before stashing the manager
+    // Build the PTY — grab reader Arc BEFORE stashing in the map
     let manager = pty::PtyManager::new(rows, cols)
         .map_err(|e| format!("Failed to open PTY: {e}"))?;
     let reader_arc = manager.take_reader();
@@ -44,99 +61,118 @@ fn init_terminal(
     // Build the TerminalEngine
     let engine = terminal::TerminalEngine::new(rows as usize, cols as usize);
 
-    // Seat both in state
+    // Insert session into the map
     {
-        let mut lock = pty_state.0.lock();
-        *lock = Some(manager);
-    }
-    {
-        let mut lock = engine_state.0.lock();
-        *lock = Some(engine);
+        let mut map = sessions.0.lock();
+        map.insert(tab_id.clone(), Session { pty: manager, engine });
     }
 
-    // Clone the engine Arc for the I/O thread
-    let engine_arc = Arc::clone(&engine_state.0);
+    // Clone what the I/O thread needs — Arc for the map, not a lock
+    let sessions_arc = Arc::clone(&sessions.0);
+    let thread_tab_id = tab_id.clone();
+    let app_handle = app.clone();
 
-    // I/O thread: PTY bytes → engine → emit snapshot
+    // I/O thread: PTY bytes → engine → emit scoped events
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
         loop {
+            // Read from PTY — NO SessionMap lock held (this can block)
             let n = {
-                // reader_arc is a std::sync::Mutex from pty.rs — .lock() returns Result
                 let mut reader = reader_arc.lock().unwrap();
                 match reader.read(&mut buf) {
-                    Ok(0) => break,  // EOF — shell exited
-                    Err(_) => break, // pipe broken
+                    Ok(0) | Err(_) => break, // EOF or pipe broken
                     Ok(n) => n,
                 }
             };
 
             let has_bell = terminal::TerminalEngine::check_bell(&buf[..n]);
 
-            let (snapshot, scrollback) = {
-                let mut eng_opt = engine_arc.lock();
-                if let Some(ref mut eng) = *eng_opt {
-                    eng.process_bytes(&buf[..n]);
-                    let sb = eng.drain_scrollback();
-                    (Some(eng.snapshot()), sb)
-                } else {
-                    (None, Vec::new())
+            // Lock SessionMap briefly to process bytes and snapshot
+            let (scrollback, snap) = {
+                let mut map = sessions_arc.lock();
+                match map.get_mut(&thread_tab_id) {
+                    Some(session) => {
+                        session.engine.process_bytes(&buf[..n]);
+                        let sb = session.engine.drain_scrollback();
+                        let s = session.engine.snapshot();
+                        (sb, Some(s))
+                    }
+                    None => break, // Session was closed externally
                 }
-            };
+            }; // Lock released here
 
-            // Emit new scrollback lines before the viewport snapshot so the
-            // frontend can prepend them before the grid repaints.
+            // Emit events (no lock held)
             if !scrollback.is_empty() {
-                let _ = app.emit("scrollback-append", &scrollback);
+                let _ = app_handle.emit(
+                    &format!("scrollback-append-{}", thread_tab_id),
+                    &scrollback,
+                );
             }
-
-            if let Some(snap) = snapshot {
-                // Fire and forget — if the window closed, we'll catch it next iteration
-                let _ = app.emit("terminal-output", &snap);
+            if let Some(snap) = snap {
+                let _ = app_handle.emit(
+                    &format!("terminal-output-{}", thread_tab_id),
+                    &snap,
+                );
             }
-
             if has_bell {
-                let _ = app.emit("terminal-bell", ());
+                let _ = app_handle.emit(
+                    &format!("terminal-bell-{}", thread_tab_id),
+                    (),
+                );
             }
         }
+
+        // Cleanup on thread exit — shell died or session was removed
+        {
+            let mut map = sessions_arc.lock();
+            map.remove(&thread_tab_id);
+        }
+        let _ = app_handle.emit(
+            &format!("session-closed-{}", thread_tab_id),
+            (),
+        );
     });
 
-    Ok(())
+    Ok(tab_id)
 }
 
-/// Send raw bytes to the shell — keypresses, paste, escape sequences, whatever.
+/// Send raw bytes to a specific session's PTY — keypresses, paste, escape sequences.
 #[tauri::command]
-fn write_to_pty(data: Vec<u8>, state: State<'_, PtyState>) -> Result<(), String> {
-    let lock = state.0.lock();
-    match lock.as_ref() {
-        Some(mgr) => mgr.write(&data).map_err(|e| format!("PTY write failed: {e}")),
-        None => Err("PTY not initialised — call init_terminal first".into()),
+fn write_to_session(tab_id: String, data: Vec<u8>, sessions: State<'_, SessionMap>) -> Result<(), String> {
+    let map = sessions.0.lock();
+    match map.get(&tab_id) {
+        Some(session) => session.pty.write(&data).map_err(|e| format!("PTY write failed: {e}")),
+        None => Err(format!("No session with id '{tab_id}'")),
     }
 }
 
-/// Resize both the TerminalEngine and the PTY. Call this when the window resizes.
+/// Resize a specific session's PTY + engine. Call when the tab's viewport changes.
 #[tauri::command]
-fn resize_terminal(
+fn resize_session(
+    tab_id: String,
     rows: u16,
     cols: u16,
-    pty_state: State<'_, PtyState>,
-    engine_state: State<'_, EngineState>,
+    sessions: State<'_, SessionMap>,
 ) -> Result<(), String> {
-    // Resize the terminal engine
-    {
-        let mut eng_opt = engine_state.0.lock();
-        if let Some(ref mut eng) = *eng_opt {
-            eng.resize(rows as usize, cols as usize);
+    let mut map = sessions.0.lock();
+    match map.get_mut(&tab_id) {
+        Some(session) => {
+            session.engine.resize(rows as usize, cols as usize);
+            session.pty.resize(rows, cols)?;
+            Ok(())
         }
+        None => Err(format!("No session with id '{tab_id}'")),
     }
-    // Resize the PTY — signals the child process too
-    {
-        let pty_lock = pty_state.0.lock();
-        if let Some(ref mgr) = *pty_lock {
-            mgr.resize(rows, cols)?;
-        }
+}
+
+/// Tear down a session — removes it from the map. The I/O thread will notice and exit.
+#[tauri::command]
+fn close_session(tab_id: String, sessions: State<'_, SessionMap>) -> Result<(), String> {
+    let mut map = sessions.0.lock();
+    match map.remove(&tab_id) {
+        Some(_) => Ok(()),
+        None => Err(format!("No session with id '{tab_id}'")),
     }
-    Ok(())
 }
 
 // ─── Ollama Commands ──────────────────────────────────────────────────────────
@@ -290,20 +326,21 @@ fn open_file(path: String) -> Result<(), String> {
 
 // ─── Theme Commands ───────────────────────────────────────────────────────────
 
-/// Update the terminal engine's colour mapping at runtime.
+/// Update the terminal engine's colour mapping at runtime for a specific session.
 /// `colors` is a JSON object of { "black": [r,g,b], "red": [r,g,b], … }
-/// Emits "theme-applied" so the frontend can force a grid redraw.
+/// Emits "theme-applied-{tab_id}" so the frontend can force a grid redraw.
 #[tauri::command]
 fn set_theme_colors(
+    tab_id: String,
     colors: serde_json::Value,
-    engine_state: State<'_, EngineState>,
+    sessions: State<'_, SessionMap>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let mut lock = engine_state.0.lock();
-    if let Some(ref mut eng) = *lock {
-        eng.set_theme_colors(&colors);
+    let mut map = sessions.0.lock();
+    if let Some(session) = map.get_mut(&tab_id) {
+        session.engine.set_theme_colors(&colors);
     }
-    let _ = app.emit("theme-applied", ());
+    let _ = app.emit(&format!("theme-applied-{}", tab_id), ());
     Ok(())
 }
 
@@ -612,8 +649,7 @@ async fn agent_fetch_url(url: String) -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(PtyState(Arc::new(Mutex::new(None))))
-        .manage(EngineState(Arc::new(Mutex::new(None))))
+        .manage(SessionMap(Arc::new(Mutex::new(HashMap::new()))))
         .manage(OllamaState(Arc::new(AsyncMutex::new(
             ollama::OllamaClient::new(),
         ))))
@@ -621,9 +657,10 @@ pub fn run() {
             openai_compat::OpenAICompatClient::new(),
         ))))
         .invoke_handler(tauri::generate_handler![
-            init_terminal,
-            write_to_pty,
-            resize_terminal,
+            create_session,
+            write_to_session,
+            resize_session,
+            close_session,
             llm_query,
             switch_model,
             check_ollama,

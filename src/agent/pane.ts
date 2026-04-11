@@ -188,10 +188,12 @@ export class AgentPane {
     }).catch(() => {});
 
     // Resize terminal back to full width
-    import("../main").then(({ domGrid }) => {
-      const { rows, cols } = domGrid.measureGrid();
-      domGrid.resize(rows, cols);
-      invoke("resize_terminal", { rows, cols }).catch(console.warn);
+    import("../main").then(({ tabManager }) => {
+      const tab = tabManager.getActive();
+      if (tab) {
+        const { rows, cols } = tab.grid.measureGrid();
+        tab.resize(rows, cols);
+      }
     }).catch(console.warn);
 
     // Remove capture handler

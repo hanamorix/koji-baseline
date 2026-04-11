@@ -11,6 +11,7 @@ import { TerminalSearch } from "../terminal/search";
 import { BlockRenderer } from "../blocks/block-renderer";
 import { ErrorAssist } from "../blocks/error-assist";
 import { SemanticSearch } from "../terminal/semantic-search";
+import { AiSuggest } from "../terminal/ai-suggest";
 import { applyClickableRegions } from "../terminal/clickable";
 import { findNearestZone, scrollToLine } from "../terminal/zones";
 import { fontManager } from "../fonts/fonts";
@@ -37,6 +38,7 @@ export class TabSession {
   readonly blocks: BlockRenderer;
   readonly errorAssist: ErrorAssist;
   readonly semanticSearch: SemanticSearch;
+  readonly aiSuggest: AiSuggest;
   readonly containerEl: HTMLDivElement;
 
   private unlisteners: UnlistenFn[] = [];
@@ -69,11 +71,11 @@ export class TabSession {
     this.blocks = new BlockRenderer(this.grid);
     this.errorAssist = new ErrorAssist(this.grid);
     this.semanticSearch = new SemanticSearch(this.grid.getGridElement(), (cmd) => {
-      // Insert the selected command into the terminal
       this.currentInput = cmd;
       const bytes = Array.from(new TextEncoder().encode(cmd));
       this.writePty(bytes).catch(console.error);
     });
+    this.aiSuggest = new AiSuggest();
   }
 
   get name(): string { return this._name; }

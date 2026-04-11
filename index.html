@@ -21,6 +21,8 @@
         <span class="llm-dot" id="llm-dot" aria-hidden="true">●</span>
       </span>
       <span class="separator" aria-hidden="true">│</span>
+      <span class="secure-input-icon" id="secure-input" role="button" tabindex="0" aria-label="Toggle secure keyboard entry" title="Secure keyboard entry">🔓</span>
+      <span class="separator" aria-hidden="true">│</span>
       <span class="era-clock" id="era-clock" aria-label="Clock">--</span>
       <span class="idle-icon" id="idle-icon" aria-hidden="true"></span>
     </div>
@@ -31,6 +33,9 @@
       <button class="tabbar-new" id="tabbar-new" title="New tab (Cmd+T)" aria-label="New tab">+</button>
       <span class="proxy-path" id="proxy-path" title="Current directory"></span>
     </div>
+
+    <!-- ── Visor (quick terminal dropdown) ──────────────────── -->
+    <div class="visor-panel" id="visor-panel"></div>
 
     <!-- ── Terminal canvas ────────────────────────────────────── -->
     <div class="terminal-viewport" id="terminal-container" role="main" aria-label="Terminal">

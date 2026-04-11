@@ -177,6 +177,15 @@ html, body {
   font-size: 11px;
 }
 
+.dashboard-top .secure-input-icon {
+  cursor: pointer;
+  color: var(--koji-faded);
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+.dashboard-top .secure-input-icon.active { color: var(--koji-orange); }
+
 .dashboard-top .era-clock {
   margin-left: auto;
   color: var(--koji-muted);
@@ -1351,6 +1360,38 @@ html, body {
 
 .semantic-search-item-cmd { font-family: inherit; }
 .semantic-search-item-meta { font-size: 10px; color: var(--koji-faded); margin-top: 2px; }
+
+/* ── Visor (quick terminal) ──────────────────────────────────────────────── */
+
+.visor-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40vh;
+  background: var(--koji-void);
+  border-bottom: 2px solid var(--koji-orange);
+  z-index: 90;
+  transform: translateY(-100%);
+  transition: transform 0.25s ease;
+  overflow: hidden;
+  display: none;
+}
+
+.visor-panel.visor-open {
+  display: block;
+  transform: translateY(0);
+}
+
+/* Secure input indicator */
+.secure-input-icon {
+  cursor: pointer;
+  color: var(--koji-faded);
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+.secure-input-icon.active { color: var(--koji-orange); }
 
 /* Tab layout wrapper */
 .tab-layout-wrapper {

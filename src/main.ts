@@ -22,6 +22,7 @@ import { TabManager } from "./tabs/tab-manager";
 import { KeybindingManager } from "./config/keybindings";
 import { openPalette, isPaletteOpen } from "./config/palette";
 import { historyDb } from "./terminal/history-db";
+import { Visor } from "./visor/visor";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -95,6 +96,12 @@ keybindings.register("pane_zoom", "cmd+shift+enter", () => tabManager.togglePane
 keybindings.register("history_search", "ctrl+r", () => {
   const tab = tabManager.getActive();
   tab?.semanticSearch.open();
+});
+
+// ─── Visor (quick terminal dropdown) ────────────────────────────────────────
+const visor = new Visor(40);
+keybindings.register("visor_toggle", "cmd+`", () => {
+  visor.toggle().catch(console.error);
 });
 
 // Load TOML config and update keybindings
@@ -201,6 +208,16 @@ if (llmBadge) {
   });
 }
 
+// ─── Secure keyboard entry ───────────────────────────────────────────────────
+const secureEl = document.getElementById("secure-input");
+if (secureEl) {
+  secureEl.addEventListener("click", async () => {
+    const enabled = await invoke<boolean>("toggle_secure_input");
+    secureEl.textContent = enabled ? "🔒" : "🔓";
+    secureEl.classList.toggle("active", enabled);
+  });
+}
+
 // ─── CWD tracking — update active tab name ───────────────────────────────────
 listen<{ path: string }>("cwd-changed", (event) => {
   const tab = tabManager.getActive();
@@ -277,8 +294,20 @@ window.addEventListener("keydown", async (event) => {
     return;
   }
 
-  // Try keybinding system first
+  // Try keybinding system first (handles visor toggle among others)
   if (keybindings.handleKeyEvent(event)) return;
+
+  // When visor is open, route input to its session instead of the active tab
+  if (visor.isOpen) {
+    const visorSession = visor.getSession();
+    if (visorSession) {
+      // Escape closes the visor
+      if (key === "Escape") { event.preventDefault(); visor.hide(); return; }
+      const seq = keyToAnsi(event);
+      if (seq !== null) { event.preventDefault(); visorSession.writePty(Array.from(new TextEncoder().encode(seq))).catch(console.error); }
+      return;
+    }
+  }
 
   // Get active tab for remaining handlers
   const tab = tabManager.getActive();

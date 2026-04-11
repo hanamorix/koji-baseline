@@ -161,6 +161,7 @@ export class TabSession {
     // Zones from OSC 133
     const zonesUn = await listen<CommandZone[]>(`zones-update-${this.id}`, (event) => {
       this._zones = event.payload;
+      this.renderZoneIndicators();
     });
     this.unlisteners.push(zonesUn);
 
@@ -229,6 +230,25 @@ export class TabSession {
     const scrollTop = this.grid.getScrollElement().scrollTop;
     const target = findNearestZone(this._zones, "down", scrollTop, lineHeight);
     if (target !== null) scrollToLine(this.grid, target, lineHeight);
+  }
+
+  private renderZoneIndicators(): void {
+    // Remove existing markers
+    this.containerEl.querySelectorAll(".zone-failed-marker").forEach((el) => el.remove());
+
+    const lineHeight = this.grid.getFontSize() * 1.3;
+
+    for (const zone of this._zones) {
+      if (zone.exit_code !== null && zone.exit_code !== 0) {
+        const marker = document.createElement("div");
+        marker.className = "zone-failed-marker";
+        const top = zone.prompt_line * lineHeight;
+        const height = ((zone.end_line ?? zone.prompt_line) - zone.prompt_line + 1) * lineHeight;
+        marker.style.top = `${top}px`;
+        marker.style.height = `${Math.max(lineHeight, height)}px`;
+        this.containerEl.appendChild(marker);
+      }
+    }
   }
 
   async close(): Promise<void> {

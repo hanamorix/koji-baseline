@@ -58,6 +58,14 @@ export class TabManager {
       const basename = path.split("/").pop() || path;
       session.name = basename;
       this.renderTabBar();
+      // Update dashboard CWD if this is the active tab
+      if (session.active) {
+        const cwdEl = document.getElementById("cwd-path");
+        if (cwdEl) {
+          const display = path.replace(/^\/Users\/[^/]+/, "~");
+          cwdEl.textContent = display;
+        }
+      }
     });
 
     try {

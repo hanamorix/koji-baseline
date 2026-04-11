@@ -991,3 +991,15 @@ html, body {
   pointer-events: none;
   z-index: 5;
 }
+
+/* ── Zone indicators ─────────────────────────────────────────────────────── */
+
+.zone-failed-marker {
+  position: absolute;
+  left: 0;
+  width: 3px;
+  background: var(--koji-error);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 4;
+}

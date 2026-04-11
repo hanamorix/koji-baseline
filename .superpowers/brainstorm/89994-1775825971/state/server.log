@@ -1,4 +1,0 @@
-{"type":"server-started","port":64024,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:64024","screen_dir":"/Users/hanamori/koji-baseline/.superpowers/brainstorm/89994-1775825971/content","state_dir":"/Users/hanamori/koji-baseline/.superpowers/brainstorm/89994-1775825971/state"}
-{"type":"screen-added","file":"/Users/hanamori/koji-baseline/.superpowers/brainstorm/89994-1775825971/content/agent-ui.html"}
-{"type":"screen-added","file":"/Users/hanamori/koji-baseline/.superpowers/brainstorm/89994-1775825971/content/waiting-3.html"}
-{"type":"server-stopped","reason":"idle timeout"}

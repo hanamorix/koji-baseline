@@ -863,3 +863,107 @@ html, body {
   text-decoration-color: var(--koji-orange);
   cursor: pointer;
 }
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+
+.terminal-tabbar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  background: var(--koji-void);
+  border-bottom: 1px solid var(--koji-deep);
+  padding: 0 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tabbar-tabs {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  gap: 1px;
+  scrollbar-width: none;
+}
+
+.tabbar-tabs::-webkit-scrollbar { display: none; }
+
+.tabbar-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 28px;
+  font-size: 11px;
+  color: var(--koji-faded);
+  cursor: pointer;
+  white-space: nowrap;
+  border-top: 2px solid transparent;
+  flex-shrink: 0;
+}
+
+.tabbar-tab:hover { background: var(--koji-dim); color: var(--koji-warm); }
+
+.tabbar-tab.active {
+  color: var(--koji-bright);
+  background: var(--koji-deep);
+  border-top-color: var(--koji-orange);
+}
+
+.tabbar-tab-label { overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+
+.tabbar-tab-close {
+  display: none;
+  font-size: 10px;
+  color: var(--koji-faded);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.tabbar-tab:hover .tabbar-tab-close { display: inline; }
+.tabbar-tab-close:hover { color: var(--koji-error); }
+
+.tabbar-new {
+  background: transparent;
+  border: none;
+  color: var(--koji-faded);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 8px;
+  height: 28px;
+  line-height: 28px;
+  flex-shrink: 0;
+}
+
+.tabbar-new:hover { color: var(--koji-bright); }
+
+/* "Linked" animation overlay */
+.linked-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.linked-text {
+  color: var(--koji-bright);
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 8px;
+  text-transform: uppercase;
+  opacity: 1;
+  transition: opacity 1.5s ease-out;
+}
+
+.linked-text.fade-out { opacity: 0; }
+
+/* Tab panel container */
+.tab-panel {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+}

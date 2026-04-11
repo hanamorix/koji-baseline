@@ -144,6 +144,20 @@ export class TabSession {
     });
     this.unlisteners.push(clipUn);
 
+    // Clipboard load from OSC 52 (remote app requesting clipboard content)
+    const clipLoadUn = await listen(`clipboard-load-${this.id}`, async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const encoded = btoa(text);
+        const response = `\x1b]52;c;${encoded}\x07`;
+        const bytes = Array.from(new TextEncoder().encode(response));
+        await this.writePty(bytes);
+      } catch {
+        // Clipboard read denied — silently ignore
+      }
+    });
+    this.unlisteners.push(clipLoadUn);
+
     // Zones from OSC 133
     const zonesUn = await listen<CommandZone[]>(`zones-update-${this.id}`, (event) => {
       this._zones = event.payload;

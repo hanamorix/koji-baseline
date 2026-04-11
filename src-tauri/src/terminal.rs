@@ -315,6 +315,9 @@ impl TerminalEngine {
                 OscEventKind::WorkingDirectory(path) => {
                     self.cwd = Some(path.clone());
                 }
+                OscEventKind::SyncStart | OscEventKind::SyncEnd => {
+                    // Handled in the I/O thread — no zone/engine action needed
+                }
             }
         }
     }

@@ -13,6 +13,8 @@ pub enum OscEventKind {
     InputStart,
     OutputStart,
     CommandEnd { exit_code: Option<i32> },
+    SyncStart,
+    SyncEnd,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -26,10 +28,32 @@ pub struct OscEvent {
 /// Returns all events found, in order. Empty vec for normal output.
 pub fn scan_osc(bytes: &[u8]) -> Vec<OscEvent> {
     let mut events = Vec::new();
+    let len = bytes.len();
     let mut i = 0;
-    while i < bytes.len() {
+    while i < len {
+        // CSI ? 2026 h/l — synchronized update (DCS mode 2026)
+        if bytes[i] == 0x1b && i + 7 < len
+            && bytes[i + 1] == b'['
+            && bytes[i + 2] == b'?'
+            && bytes[i + 3] == b'2'
+            && bytes[i + 4] == b'0'
+            && bytes[i + 5] == b'2'
+            && bytes[i + 6] == b'6'
+        {
+            if bytes[i + 7] == b'h' {
+                events.push(OscEvent { kind: OscEventKind::SyncStart });
+                i += 8;
+                continue;
+            }
+            if bytes[i + 7] == b'l' {
+                events.push(OscEvent { kind: OscEventKind::SyncEnd });
+                i += 8;
+                continue;
+            }
+        }
+
         // Look for ESC ] (0x1B 0x5D)
-        if bytes[i] == 0x1B && i + 1 < bytes.len() && bytes[i + 1] == 0x5D {
+        if bytes[i] == 0x1B && i + 1 < len && bytes[i + 1] == 0x5D {
             if let Some((event, consumed)) = parse_osc(&bytes[i + 2..]) {
                 events.push(event);
                 i += 2 + consumed;
@@ -269,5 +293,15 @@ mod tests {
         let input = b"\x1b]zzz;garbage\x07\x1b];\x07\x1b]\xff\x07";
         let events = scan_osc(input);
         assert!(events.is_empty());
+    }
+
+    // 13. DCS mode 2026 — synchronized update start + end
+    #[test]
+    fn test_scan_sync_start_end() {
+        let bytes = b"\x1b[?2026h some content \x1b[?2026l";
+        let events = scan_osc(bytes);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].kind, OscEventKind::SyncStart);
+        assert_eq!(events[1].kind, OscEventKind::SyncEnd);
     }
 }

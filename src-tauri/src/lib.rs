@@ -80,6 +80,10 @@ fn create_session(
         let ev_title = format!("title-changed-{}", thread_tab_id);
         let ev_clipboard = format!("clipboard-store-{}", thread_tab_id);
         let ev_zones = format!("zones-update-{}", thread_tab_id);
+        let ev_clip_load = format!("clipboard-load-{}", thread_tab_id);
+        let mut sync_active = false;
+        let mut sync_started = std::time::Instant::now();
+        const SYNC_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(100);
         loop {
             // Read from PTY — NO SessionMap lock held (this can block)
             let n = {
@@ -90,8 +94,27 @@ fn create_session(
                 }
             };
 
-            // Scan for OSC 7/133 before alacritty processes the bytes
+            // Scan for OSC 7/133/sync before alacritty processes the bytes
             let osc_events = osc::scan_osc(&buf[..n]);
+
+            // Track synchronized update state (DCS mode 2026)
+            for osc_ev in &osc_events {
+                match osc_ev.kind {
+                    osc::OscEventKind::SyncStart => {
+                        sync_active = true;
+                        sync_started = std::time::Instant::now();
+                    }
+                    osc::OscEventKind::SyncEnd => {
+                        sync_active = false;
+                    }
+                    _ => {}
+                }
+            }
+
+            // Timeout safety: force-emit if sync pending > 100ms
+            if sync_active && sync_started.elapsed() > SYNC_TIMEOUT {
+                sync_active = false;
+            }
 
             // Compute timestamp for zone tracking
             let now_ms = std::time::SystemTime::now()
@@ -146,6 +169,9 @@ fn create_session(
                         alacritty_terminal::event::Event::Bell => {
                             let _ = app_handle.emit(&ev_bell, ());
                         }
+                        alacritty_terminal::event::Event::ClipboardLoad(_, _) => {
+                            let _ = app_handle.emit(&ev_clip_load, ());
+                        }
                         alacritty_terminal::event::Event::PtyWrite(text) => {
                             // Write response sequences back to PTY
                             let map = sessions_arc.lock();
@@ -163,7 +189,9 @@ fn create_session(
                 let _ = app_handle.emit(&ev_scrollback, &scrollback);
             }
             if let Some(snap) = snap {
-                let _ = app_handle.emit(&ev_output, &snap);
+                if !sync_active {
+                    let _ = app_handle.emit(&ev_output, &snap);
+                }
             }
             if let Some(cwd) = new_cwd {
                 let _ = app_handle.emit(&ev_cwd, serde_json::json!({ "path": cwd }));

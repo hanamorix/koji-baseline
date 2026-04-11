@@ -4,6 +4,7 @@
 import { TabSession } from "./tab-session";
 import { PaneLayout } from "../panes/pane-layout";
 import { playLinkedAnimation } from "./linked-art";
+import { enableTabDrag } from "./tab-drag";
 
 export class TabManager {
   private layouts: Map<string, PaneLayout> = new Map();
@@ -19,6 +20,12 @@ export class TabManager {
 
     document.getElementById("tabbar-new")!.addEventListener("click", () => {
       this.createTab().catch((err) => console.error("New tab failed:", err));
+    });
+
+    enableTabDrag(this.tabsContainerEl, (fromIdx, toIdx) => {
+      const [moved] = this.tabOrder.splice(fromIdx, 1);
+      this.tabOrder.splice(toIdx, 0, moved);
+      this.renderTabBar();
     });
   }
 

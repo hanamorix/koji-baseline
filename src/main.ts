@@ -159,6 +159,23 @@ listen("theme-applied", () => {
   console.warn("theme-applied listener failed:", err);
 });
 
+// ─── Long-running command notification ───────────────────────────────────────
+
+listen<{ exit_code: number | null; duration_seconds: number }>("notify-command-complete", (event) => {
+  if (document.hasFocus()) return;
+  const { exit_code, duration_seconds } = event.payload;
+  const status = exit_code === 0 ? "completed" : `failed (exit ${exit_code})`;
+  if (Notification.permission === "granted") {
+    new Notification("Kōji Baseline", { body: `Command ${status} after ${duration_seconds}s` });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then((perm) => {
+      if (perm === "granted") {
+        new Notification("Kōji Baseline", { body: `Command ${status} after ${duration_seconds}s` });
+      }
+    });
+  }
+}).catch(() => {});
+
 // ─── Resize observer — grid adapts to window ─────────────────────────────────
 
 let resizeTimer: number | null = null;

@@ -201,6 +201,21 @@ fn create_session(
                 let map = sessions_arc.lock();
                 if let Some(session) = map.get(&thread_tab_id) {
                     let _ = app_handle.emit(&ev_zones, &session.engine.zones);
+
+                    // Notify on long-running command completion when window is not focused
+                    if let Some(zone) = session.engine.zones.last() {
+                        if zone.end_time.is_some() && zone.start_time > 0 {
+                            let duration_ms = zone.end_time.unwrap_or(0) - zone.start_time;
+                            let toml_config = crate::config::load();
+                            let min_ms = toml_config.notifications.min_duration_seconds * 1000;
+                            if toml_config.notifications.enabled && duration_ms >= min_ms {
+                                let _ = app_handle.emit("notify-command-complete", serde_json::json!({
+                                    "exit_code": zone.exit_code,
+                                    "duration_seconds": duration_ms / 1000,
+                                }));
+                            }
+                        }
+                    }
                 }
             }
         }

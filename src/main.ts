@@ -23,6 +23,7 @@ import { KeybindingManager } from "./config/keybindings";
 import { openPalette, isPaletteOpen } from "./config/palette";
 import { historyDb } from "./terminal/history-db";
 import { Visor } from "./visor/visor";
+import { saveSession } from "./session/restore";
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,16 @@ const visor = new Visor(40);
 keybindings.register("visor_toggle", "cmd+`", () => {
   visor.toggle().catch(console.error);
 });
+
+// ─── Session save on close ──────────────────────────────────────────────────
+try {
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  getCurrentWindow().onCloseRequested(async () => {
+    await saveSession(tabManager);
+  });
+} catch {
+  // Window API not available in dev mode — non-fatal
+}
 
 // Load TOML config and update keybindings
 invoke("load_toml_config").then((config: unknown) => {

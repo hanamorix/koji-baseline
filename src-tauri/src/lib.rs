@@ -48,7 +48,7 @@ fn create_session(
     let reader_arc = manager.take_reader();
 
     // Build the TerminalEngine
-    let engine = terminal::TerminalEngine::new(rows as usize, cols as usize);
+    let (engine, _event_buf) = terminal::TerminalEngine::new(rows as usize, cols as usize);
 
     // Insert session into the map
     {

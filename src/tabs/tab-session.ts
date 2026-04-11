@@ -9,6 +9,7 @@ import { Autocomplete } from "../terminal/autocomplete";
 import { TransitionEffects } from "../animation/effects";
 import { TerminalSearch } from "../terminal/search";
 import { applyClickableRegions } from "../terminal/clickable";
+import { findNearestZone, scrollToLine } from "../terminal/zones";
 import { fontManager } from "../fonts/fonts";
 import { themeManager } from "../themes/manager";
 
@@ -200,6 +201,20 @@ export class TabSession {
     this.grid.resize(rows, cols);
     if (!this._started) return;
     await invoke("resize_session", { tabId: this.id, rows, cols }).catch(console.warn);
+  }
+
+  jumpToPreviousZone(): void {
+    const lineHeight = this.grid.getFontSize() * 1.3;
+    const scrollTop = this.grid.getScrollElement().scrollTop;
+    const target = findNearestZone(this._zones, "up", scrollTop, lineHeight);
+    if (target !== null) scrollToLine(this.grid, target, lineHeight);
+  }
+
+  jumpToNextZone(): void {
+    const lineHeight = this.grid.getFontSize() * 1.3;
+    const scrollTop = this.grid.getScrollElement().scrollTop;
+    const target = findNearestZone(this._zones, "down", scrollTop, lineHeight);
+    if (target !== null) scrollToLine(this.grid, target, lineHeight);
   }
 
   async close(): Promise<void> {

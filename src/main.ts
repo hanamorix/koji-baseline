@@ -236,6 +236,18 @@ window.addEventListener("keydown", async (event) => {
     return;
   }
 
+  // ── Cmd+Up/Down — jump between command zones ────────────────────────────
+  if (metaKey && key === "ArrowUp" && !event.shiftKey) {
+    event.preventDefault();
+    tab.jumpToPreviousZone();
+    return;
+  }
+  if (metaKey && key === "ArrowDown" && !event.shiftKey) {
+    event.preventDefault();
+    tab.jumpToNextZone();
+    return;
+  }
+
   // ── Cmd+A — select all terminal text ──────────────────────────────────
   if (metaKey && key === "a") {
     event.preventDefault();

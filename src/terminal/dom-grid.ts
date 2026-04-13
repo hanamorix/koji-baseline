@@ -276,20 +276,23 @@ export class DOMGrid {
 
   /** Append scrollback rows above the viewport. Called when lines scroll off the top. */
   appendScrollback(rows: RenderCell[][]): void {
+    if (rows.length === 0) return;
+
+    // Build all elements into a fragment — one DOM insertion instead of N
+    const fragment = document.createDocumentFragment();
     for (const cells of rows) {
       const el = document.createElement("div");
       el.className = "grid-row";
       el.innerHTML = buildRowHTML(cells);
       if (this.inAltScreen) el.style.display = "none";
-
-      // Insert before the first viewport row
-      if (this.viewportRows.length > 0) {
-        this.scrollEl.insertBefore(el, this.viewportRows[0].el);
-      } else {
-        this.scrollEl.appendChild(el);
-      }
-
+      fragment.appendChild(el);
       this.scrollbackRows.push(el);
+    }
+
+    if (this.viewportRows.length > 0) {
+      this.scrollEl.insertBefore(fragment, this.viewportRows[0].el);
+    } else {
+      this.scrollEl.appendChild(fragment);
     }
 
     // Trim oldest scrollback if over limit

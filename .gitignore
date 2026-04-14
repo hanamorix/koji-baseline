@@ -5,3 +5,4 @@ target/
 .koji-baseline/
 .superpowers/
 *.dmg
+.tauri-release/

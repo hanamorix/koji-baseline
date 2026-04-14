@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.7.3 — 2026-04-14
+
+### fix
+- fix: terminal renders 1 row (blank viewport) — solo pane has no height
+- fix: scrollback lost during large output (Claude Code launch, cat, etc.)
+- fix: ad-hoc sign macOS bundle so Gatekeeper stops calling DMG "damaged"
+
+### chore
+- chore: add tauri-release config
+
+### other
+- Delete docs/superpowers directory
+- Delete .superpowers/brainstorm directory
+
+
 All notable changes to Koji Baseline.
 
 ## [0.7.0] — 2026-04-11

@@ -2,17 +2,11 @@
 
 ## v0.7.3 — 2026-04-14
 
-### fix
-- fix: terminal renders 1 row (blank viewport) — solo pane has no height
-- fix: scrollback lost during large output (Claude Code launch, cat, etc.)
-- fix: ad-hoc sign macOS bundle so Gatekeeper stops calling DMG "damaged"
+### Fixes
 
-### chore
-- chore: add tauri-release config
-
-### other
-- Delete docs/superpowers directory
-- Delete .superpowers/brainstorm directory
+- Terminal now renders correctly even when a solo pane has no assigned height (was showing 1 row / blank viewport).
+- Scrollback no longer gets lost during large output bursts (e.g. launching Claude Code, `cat` on big files).
+- DMG is ad-hoc signed so Gatekeeper stops marking it as "damaged" after download.
 
 
 All notable changes to Koji Baseline.

@@ -1,0 +1,8 @@
+[project]
+name = "koji-baseline"
+
+[github]
+repo = "hanamorix/koji-baseline"
+
+[sign]
+identity = "-"
